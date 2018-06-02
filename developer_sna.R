@@ -253,6 +253,135 @@ summary(t2m6)
 mcmc.diagnostics(t2m6)
 dev.off()
 
+# the effect size of nonzero is NA. Run model 4 again without nonzero effect
+# 
+
+t2m4.1 <-  ergm(developer_net ~ sum 
+              #+ nodematch("loc") + nodematch("title") # homophily theory
+               + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              # + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Geometric)
+pdf("t2m4_1.pdf")
+summary(t2m4.1)
+mcmc.diagnostics(t2m4.1)
+dev.off()
+# Error in eigen(crossprod(x1c), symmetric = TRUE) : 
+
+t2m4.2 <-  ergm(developer_net ~ sum + nonzero()
+                + absdiffcat("title")
+              #+ nodematch("loc") + nodematch("title") # homophily theory
+               + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              # + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Geometric)
+
+# Error in eigen(crossprod(x1c), symmetric = TRUE) :
+
+t2m4.3 <-  ergm(developer_net ~ sum + nonzero()
+                + absdiffcat("loc")
+              #+ nodematch("loc") + nodematch("title") # homophily theory
+               + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              # + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Geometric)
+# Error in eigen(crossprod(x1c), symmetric = TRUE) 
+t2m4.4 <-  ergm(developer_net ~ sum + nonzero()
+                + nodematch("contract")
+              #+ nodematch("loc") + nodematch("title") # homophily theory
+               + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              # + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Geometric)
+# Error in eigen(crossprod(x1c), symmetric = TRUE) : 
+# error means NA in correlation matrix. can't compute eigen values
+
+table(is.na(authatt))
+table(is.na(developer))
+
+# no NA in authatt and developer
+
+table(is.na(developer_net%v%"contract"))
+table(is.na(developer_net%v%"loc"))
+table(is.na(developer_net%v%"title"))
+table(is.na(developer_net%e%"frequency"))
+
+# no NA in the data. Then I must have infinite values in x
+# maybe I have this issue: 
+# Warning: Parameter space constrints 
+# What happens if we simulate from a geometric-
+# reference ERGM with all coe cients set to 0?
+
+# Option 1: try with other reference distritbution (Poission)
+# if not work, limit parameter space to max theoretical number of frequency
+
+t2m4.5 <-  ergm(developer_net ~ sum + nonzero()
+              #+ nodematch("loc") + nodematch("title") # homophily theory
+               + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              # + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Poisson)
+# this works. great. but is it the right reference distribution?
+pdf("t2m4_5.pdf")
+summary(t2m4.5)
+mcmc.diagnostics(t2m4.5)
+dev.off() 
+# autocorrelation is a bit off. It doesn't look like an
+# upward or downward trend. 
+# diff mcmc sampling criteria could fix the problem
+
+t2m4.6 <-  ergm(developer_net ~ sum + nonzero()
+              + nodematch("loc") 
+              + nodematch("title") # homophily theory
+              + nodematch("contract")
+              + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Poisson)
+# Approximate Hessian matrix is singular
+
+t2m4.7 <-  ergm(developer_net ~ sum + nonzero()
+              + nodematch("loc") 
+             # + nodematch("title") # homophily theory
+            #  + nodematch("contract")
+              + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Poisson)
+# MCMLE estimation did not converge after 20 iterations
+
+t2m4.8 <-  ergm(developer_net ~ sum + nonzero()
+             # + nodematch("loc") 
+              + nodematch("title") # homophily theory
+             # + nodematch("contract")
+              + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Poisson)
+# Approximate Hessian matrix is singular
+# 
+pdf("t2m4_8.pdf")
+summary(t2m4.8)
+mcmc.diagnostics(t2m4.8)
+dev.off() 
+# mcmc smapling total off for nonzero parameter
+
+t2m4.9 <-  ergm(developer_net ~ sum + nonzero()
+             # + nodematch("loc") 
+             # + nodematch("title") # homophily theory
+              + nodematch("contract")
+              + nodesqrtcovar(center=T)
+              + transitiveweights("min","max","min")
+              + cyclicalweights("min","max","min")
+              , response="frequency", reference=~Poisson)
+
+# It seems like the attribute contract results in a worser model based on the mcmc
+# Decisions: 
+# 1. test t2m4.9. 
+# 2. increase mcmc sample size for t2m4.7
+# 3. test a odel with location and contract
+
+
 # failed models -----------------------------------------------------------
 
 
