@@ -377,10 +377,20 @@ t2m4.9 <-  ergm(developer_net ~ sum + nonzero()
 
 # It seems like the attribute contract results in a worser model based on the mcmc
 # Decisions: 
-# 1. test t2m4.9. 
+# 1. test t2m4.9.  --> done: results: approximate hessian matrix is signular 
+# insufficient sample size or highly correlated terms
 # 2. increase mcmc sample size for t2m4.7
-# 3. test a odel with location and contract
+# 3. test a odel with location and contract (including all author attributes) + higher mcmc sample size
 
+t2m4.10 <-  ergm(developer_net ~ sum + nonzero()
+                + nodematch("loc") 
+                + nodematch("title") # homophily theory
+                + nodematch("contract")
+                + nodesqrtcovar(center=T)
+                + transitiveweights("min","max","min")
+                + cyclicalweights("min","max","min")
+                , response="frequency", reference=~Poisson
+                , control = control.ergm(MCMC.samplesize = 50000))
 
 # failed models -----------------------------------------------------------
 
