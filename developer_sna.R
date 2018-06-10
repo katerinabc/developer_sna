@@ -392,6 +392,93 @@ t2m4.10 <-  ergm(developer_net ~ sum + nonzero()
                 , response="frequency", reference=~Poisson
                 , control = control.ergm(MCMC.samplesize = 50000))
 
+# run t2m4.7 again with higher sample size
+gof_t2m410 <- gof(t2m4.10) # gof for valued ergm not implemented
+# no gof for valued ergms
+summary(gof_t2m410)
+pdf("results_t2m410.pdf")
+summary(t2m4.10)
+mcmc.diagnostics(t2m4.10)
+plot(gof_t2m410)
+dev.off()
+
+t2m4.11 <-  ergm(developer_net ~ sum + nonzero()
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 + cyclicalweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(#MCMC.samplesize = 10000,
+                                          MCMC.prop.weights='0inflated')
+                )
+#Error in eigen(crossprod(x1c), symmetric = TRUE) : infinite or missing values in 'x'
+
+# exploration
+# mean and variance of dyad values
+mean(developer_net%e%'frequency')
+min(developer_net%e%'frequency')
+max(developer_net%e%'frequency')
+var(developer_net%e%'frequency')
+
+t2m4.12 <-  ergm(developer_net ~ sum + nonzero()
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 + cyclicalweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(#MCMC.samplesize = 50000,
+                                          MCMC.prop.weights='0inflated') # to control for skweded degree distribution
+)
+# warning: approximate hessian matrix is signular. 
+# increase sample size to 5,000 and see
+t2m4.12 <-  ergm(developer_net ~ sum + nonzero()
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 + cyclicalweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 5000,
+                   MCMC.prop.weights='0inflated') # to control for skweded degree distribution
+)
+
+# correlation btw transitiveweights, cyclicalweights, nodesqrtcovar
+kcycle <- sna::kcycle.census(developer_net, mode="graph", maxlen=4)
+cor(kcycle[[1]][2,],kcycle[[1]][3,])
+# correlationis 0.989
+# decision: take out cycleweights (abritrary decision)
+t2m4.12 <-  ergm(developer_net ~ sum + nonzero()
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 2000,
+                                          MCMC.prop.weights='0inflated') # to control for skweded degree distribution
+)
+
+# convergence not achieved after 20 iterations
+
+t2m4.12b <-  ergm(developer_net ~ sum + nonzero()
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 5000,
+                                          MCMC.prop.weights='0inflated', # to control for skweded degree distribution
+                                          init =coef(t2m4.12)
+                                          )
+)
+
+
 # failed models -----------------------------------------------------------
 
 
