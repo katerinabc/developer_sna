@@ -25,7 +25,21 @@ The collaboration matrix for each software version is pretty small (see Figure 1
 For valued ERGMs it is necessary to provide a reference distribution. The space from which to draw sample networks. For example if the values in the networks can only be 0 or 1 then the sample distirbution is a uniform or truncated geometric distribution or a binominal distribution. In case there is no upper bound on the values of ties a *geometric* or *Poission* distribution should be used. Andy Pilny argues that the Poisson distribution is useful when average tie value isn't much different to the variance. If this is not the case geometric distribution should be used. This makes geometric distribution very useful for very skewed distribution of edge values, where most nodes are 0.
 
 A histogram of frequency shows that most edges were 0. 
-![Degree Distribution for Software Dvelopment.](~/Documents/gitrepo/developer_sna/fig/histogram_frequency_develoepr_projections.png). But when running various ergms models with a geometric distribution I kept on running into problems with the eigenvalues (*Error in eigen(crossprod(x1c), symmetric=TRUE): infinite or missing values in x*). There aren't any missing values. 
+![Degree Distribution for Software Dvelopment.](~/Documents/gitrepo/developer_sna/fig/histogram_frequency_develoepr_projections.png). But when running various ergms models with a geometric distribution I kept on running into problems with the eigenvalues (*Error in eigen(crossprod(x1c), symmetric=TRUE): infinite or missing values in x*). There aren't any missing values.
+
+Based on advice by Pavel Kirsti adding a control term 'control = control.ergm(MCMC.prop.weights='0inflated')'together with the Poisson reference distribution could work. 
+
+The following problem was a singular approximate Hessian matrix. Often the reason is collinearity between variables. If I understand it correctly, the Hessian matrix is a derivative (*second order partial derivative*). It describes local points (curves) of a function which has many variables. It is singular if at least (?) two variables in the Hessian matrix (or its approximation) are the same and thus have a perfect (positive) correlation
+
+The first solution was to check collinearity between variables. The command 'kcycle' calculates path or cycle census information. The output in our case 'kcycle(developer_net, mode="graph", maxlen = 4)' provides in the first column the aggregate of path counts and in the other columns information abhout path counts for each developer's. Concretely, it counts how often someone has two paths, three cycle, 4 cycle
+???am i correct. Below an example:
+   Agg chiara.moretti fabio.boldrin alessandro.basso andrea.rana
+2    0              0             0                0           0
+3  453             48           103               82           6
+4 4041            585          1230              982          42
+
+
+The first solution was to increase the MCMC sample size. As this is taking (very) long on my old laptop, the next step is to increase the step size to get regain some time. Increasing the 
 
 
 ### Hypothesis
