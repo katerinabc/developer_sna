@@ -32,15 +32,24 @@ Based on advice by Pavel Kirsti adding a control term 'control = control.ergm(MC
 The following problem was a singular approximate Hessian matrix. Often the reason is collinearity between variables. If I understand it correctly, the Hessian matrix is a derivative (*second order partial derivative*). It describes local points (curves) of a function which has many variables. It is singular if at least (?) two variables in the Hessian matrix (or its approximation) are the same and thus have a perfect (positive) correlation
 
 The first solution was to check collinearity between variables. The command 'kcycle' calculates path or cycle census information. The output in our case 'kcycle(developer_net, mode="graph", maxlen = 4)' provides in the first column the aggregate of path counts and in the other columns information abhout path counts for each developer's. Concretely, it counts how often someone has two paths, three cycle, 4 cycle
-???am i correct. Below an example:
+*Example*
    Agg chiara.moretti fabio.boldrin alessandro.basso andrea.rana
 2    0              0             0                0           0
 3  453             48           103               82           6
 4 4041            585          1230              982          42
 
 
-The first solution was to increase the MCMC sample size. As this is taking (very) long on my old laptop, the next step is to increase the step size to get regain some time. Increasing the 
+### Hypothesis for model 1
+Model 1 does not make a distinction between the type of relationship
+The following effects are included:
+1. sum: Sum is the valued version of edges. It controls for the general intensity of relationships in the network (control variable).
+2. nonzero: Might be excluded. In sparse matrices, this term accounts for the possibility of a tie, when most ties are zero (control variable). 71 % of relationships do not exist.
+3. Nodematch - location: This test if relationships are influenced by location (homophily argument). 
+4. Nodematch - Title: This test if relationships are influenced by title (homophily argument).
+5. Nodematch - Contract: This test if relationships are influenced by title (homophily argument).
+6. Nodesqrtcovar: Individuals have different propensity to interact. This terms accounts for the individual differences (control variable).
+7. Transitiveweights: A stable/ common social structure are triads. As we are modeling the appearance of relationships, taking into account that ties often appear in clusters, helps to get a better understanding of the effects. A negative transitive weights sugest hiearchical structures as ties are not formed with everyone equally. Transitiveweights takes 3 arguments: twopath, combine, affect. The default values of 'min', 'max', and 'min' are used. Twopath measures the strenght ot the two paths between i and k, and k and j). Given the strength of the two paths from i to k and k to j, combine measures their strenght on the path i to j. Finally, given this combined strenght, what is its affect on the the relationship i to j. 
 
-
-### Hypothesis
+- occurence of non-mirroring is more likely when performing routine tasks vs innovative tasks --> measured using edgecov (covariate)
+###
 
