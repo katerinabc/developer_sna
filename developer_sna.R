@@ -477,6 +477,254 @@ t2m4.12b <-  ergm(developer_net ~ sum + nonzero()
                                           init =coef(t2m4.12)
                                           )
 )
+# convergence not achieved after 20 iterations
+pdf('diag_t2m412b.pdf')
+mcmc.diagnostics(t2m4.12b)
+dev.off()
+# the only thing that looks weird is the non-zero coefficient
+
+t2m4.13 <-  ergm(developer_net ~ sum #+ nonzero()
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(#MCMC.samplesize = 2000,
+                                          MCMC.prop.weights='0inflated') # to control for skweded degree distribution
+)
+pdf('diag_t2m413.pdf')
+mcmc.diagnostics(t2m4.13)
+dev.off()
+# potential downward trend for nodematch and transitive weights
+
+
+t2m4.13b <-  ergm(developer_net ~ sum
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 2024
+                                          , MCMC.interval = 2024
+                                          , MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                        #  ,init = coef(t2m4.13)
+                 ) 
+                 
+)
+
+pdf('diag_t2m413.pdf')
+mcmc.diagnostics(t2m4.13b)
+dev.off()
+
+# sudden jump in log likelihood improvements from 1.3 to 10.6 and then down again 
+# pretty crappy model
+# clear downward trend for nodematch and upward trend for nodesqrt
+# adding nonzero doens't make sense based on previous results. It remains one value
+
+# decision: chaned uniform homophily for title to differential heterophily
+t2m4.14 <-  ergm(developer_net ~ sum
+                  + nonzero
+                  + nodematch("loc") 
+                  + nodematch("title", diff=T) # differential homophily
+                  + nodematch("contract")
+                  + nodesqrtcovar(center=T)
+                  + transitiveweights("min","max","min")
+                  , response="frequency", reference=~Poisson
+                  , control = control.ergm(#MCMC.samplesize = 2024
+                                           #, MCMC.interval = 2024
+                                            MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                           #  ,init = coef(t2m4.13)
+                  ) 
+                  
+)
+pdf('diag_t2m414.pdf')
+mcmc.diagnostics(t2m4.14b)
+dev.off()
+
+t2m4.14b <-  ergm(developer_net ~ sum
+                 + nonzero
+                 + nodematch("loc") 
+                 + nodematch("title", diff=T) # differential homophily
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 2024, 
+                                          MCMC.interval = 2024,
+                                          MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                          ,init = coef(t2m4.14)
+                 ) 
+                 
+)
+# it looks like this would never converge
+
+t2m4.15 <-  ergm(developer_net ~ sum
+                  + nonzero
+                  + greaterthan(mean(developer))
+                  + nodematch("loc") 
+                  + nodematch("title", diff=F) # differential homophily
+                  + nodematch("contract")
+                  + nodesqrtcovar(center=T)
+                  + transitiveweights("min","max","min")
+                  , response="frequency", reference=~Poisson
+                  , control = control.ergm(MCMC.samplesize = 2024, 
+                                           MCMC.interval = 2024,
+                                           MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                         
+                  ) 
+                  
+)
+pdf('diag_t2m415.pdf')
+mcmc.diagnostics(t2m4.15)
+dev.off()
+
+t2m4.15 <-  ergm(developer_net ~ sum
+                 + nonzero
+                 + greaterthan(quantile(developer, 0.85)[[1]]) # effect about being in the top 10 % of collaboration workflows
+                 + nodematch("loc") 
+                 + nodematch("title", diff=F) # differential homophily
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 5000, 
+                                          MCMC.interval = 2024,
+                                          MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                          
+                 ) 
+                 
+)
+pdf('diag_t2m415_e.pdf')
+print(summary(t2m4.15))
+mcmc.diagnostics(t2m4.15)
+dev.off()
+# with greaterthan set to top 20 % of values, I get a singular hessian matrix.
+# the error didn't appear with greater than set to top 10
+
+# the last model that converged was model 12b. check diagnostics
+
+t2m4.12c <-  ergm(developer_net ~ sum + nonzero()
+                  + nodematch("loc") 
+                  + nodematch("title") # homophily theory
+                  + nodematch("contract")
+                  + nodesqrtcovar(center=T)
+                  + transitiveweights("min","max","min")
+                  , response="frequency", reference=~Poisson
+                  , control = control.ergm(MCMC.samplesize = 8000,
+                                           MCMC.interval = 2024,
+                                           MCMC.prop.weights='0inflated', # to control for skweded degree distribution
+                                           init =coef(t2m4.12)
+                  )
+)
+
+pdf('diag_t2m412_c.pdf')
+print(summary(t2m4.12c))
+mcmc.diagnostics(t2m4.12c)
+dev.off()
+
+t2m4.12d <-  ergm(developer_net ~ sum + nonzero()
+                  + nodematch("loc") 
+                  + nodematch("title") # homophily theory
+                  + nodematch("contract")
+                  + nodesqrtcovar(center=T)
+                  + transitiveweights("min","max","min")
+                  , response="frequency", reference=~Poisson
+                  , control = control.ergm(MCMC.samplesize = 10000,
+                                           MCMC.interval = 2024,
+                                           MCMC.prop.weights='0inflated', # to control for skweded degree distribution
+                                           init =coef(t2m4.12c)
+                  )
+)
+
+pdf('diag_t2m412_d.pdf')
+print(summary(t2m4.12d))
+mcmc.diagnostics(t2m4.12d)
+dev.off()
+#still no convergence. Abandon this model
+
+t2m4.16 <-  ergm(developer_net ~ sum + 
+                  + atmost(8)
+                  + nodematch("loc") 
+                  + nodematch("title") # homophily theory
+                  + nodematch("contract")
+                  + nodesqrtcovar(center=T)
+                  + transitiveweights("min","max","min")
+                  , response="frequency", reference=~Poisson
+                  , control = control.ergm(MCMC.samplesize = 5000,
+                                           #MCMC.interval = 2024,
+                                           MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                          )
+                  )
+# replaced nonzero effect with atmost(8). This extends the nonzero effect to
+# nearly 50 % of the dyads. the nonzero effect never mixed well--> no convergence
+
+t2m4.16 <-  ergm(developer_net ~ sum
+                 + atmost(8)
+                 + nodematch("loc") 
+                 + nodematch("title") # homophily theory
+                 + nodematch("contract")
+                 + nodemix(c("loc", "title"))
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(#MCMC.samplesize = 5000,
+                                          MCMC.interval = 2024,
+                                          MCMC.burnin = 50000,
+                                          MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                 )
+)
+# t2m4.16 run 1
+# no convergence. added equalto(11283) to account for the highest value of relationship
+# a lot of variance in the atmost.8 effect. but not an upward or downward trend
+# no standard error for greaterthan. The reason is no (or insufficient variance) ?
+
+# t2m4.16 run 2
+# no convergence. take out the greaterthan and equalto terms. No std error, no variance
+
+# t2m4.16 run 3
+# no convergence. effect ofr atmost8 doesn't do well. leave out completely
+# but rest wasn't that bad
+
+# t2m4.16 run 4
+# without a term such as atmost(8) the mcmc chains don't mix. ther eis a upward or downward trend
+# ? cycliccalties, edges, interval, add absdiffcat for differences in hierarchy
+# nodemix: interaction between two attributes
+
+# t2m4.16 run 5
+# added interaction btw location and title (nodemix). Added atmost(8) back
+# system computational singular
+
+# t2m4.16 run 6
+# instead of atmost use atleast as a more restrictive form of nonzero
+# no convergence.
+
+# t2m4.16 run 7
+# increased sample size
+# changed term nodematch title to absdiffcat to account for hierarchical differences
+t2m4.16 <-  ergm(developer_net ~ sum
+                 + atleast(8)
+                 + nodematch("loc") 
+                 + absdiffcat("title", base =c(1:5)) 
+                 + nodematch("contract")
+                 + nodesqrtcovar(center=T)
+                 + transitiveweights("min","max","min")
+                 , response="frequency", reference=~Poisson
+                 , control = control.ergm(MCMC.samplesize = 5000,
+                   MCMC.interval = 2024,
+                   MCMC.burnin = 50000,
+                   MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                 )
+)
+summary(t2m4.16)
+mcmc.diagnostics(t2m4.16)
+
+
+# continue t2m12d with higher burnout? that should reduce geweke stats, but what about convergence
+
+
+
 
 
 # failed models -----------------------------------------------------------
