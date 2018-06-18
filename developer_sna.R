@@ -1,7 +1,6 @@
 # Script for Collaboration Analysis
 # Research Owner: Mahdi
-# latest update: 21st May 2018
-# 
+# latest update: june 18th 
 # 
 
 # questions ---------------------------------------------------------------
@@ -65,8 +64,9 @@ tasks <- get.adjacency(pr$proj2,sparse=FALSE,attr="weight")
 
 # developer network
 # function to get network data for one software version
-devnetwork <- function(dataset, version_number){
-  small_subset <- dataset[dataset$ver ==version_number,]
+devnetwork <- function(dataset, version_number=NULL){
+  require(igraph, quietly=T)
+  small_subset <- dataset[dataset$ver == version_number,]
   bg <- graph.empty(directed = F)
   node.out <- unique(small_subset$author) 
   node.in <- unique(small_subset$Filename) 
@@ -77,6 +77,20 @@ devnetwork <- function(dataset, version_number){
   pr <- bipartite.projection(bg) 
   return(get.adjacency(pr$proj1,sparse=FALSE,attr="weight"))
 }
+
+devnetwork_version <- function(dataset){
+  require(igraph, quietly=T)
+  bg <- graph.empty(directed = F)
+  node.out <- unique(dataset$author) 
+  node.in <- unique(dataset$Filename) 
+  bg <- add.vertices(bg,nv=length(node.out),attr=list(name=node.out),type=rep(FALSE,length(node.out)))
+  bg <- add.vertices(bg,nv=length(node.in),attr=list(name=node.in),type=rep(TRUE,length(node.in)))
+  edge.list.vec <- as.vector(t(as.matrix(data.frame(dataset[,c(1:2)]))))
+  bg <- add.edges(bg,edge.list.vec)
+  pr <- bipartite.projection(bg) 
+  return(get.adjacency(pr$proj1,sparse=FALSE,attr="weight"))
+}
+
 
 draw_dev_net <- function(network, )
 dev_v1 <- devnetwork(DF, 1)
@@ -723,6 +737,102 @@ mcmc.diagnostics(t2m4.16)
 
 # continue t2m12d with higher burnout? that should reduce geweke stats, but what about convergence
 
+
+# analysis v4 -------------------------------------------------------------
+
+# testing of non-mirroring hypothesis
+# dependent network: developer-by-developer (realized coordination)
+# IV-1: needed coordination based on task dependencies
+# IV-2: ownership dependencies: the one who created the folder owns the files
+# in the folder, but not the subfolders
+
+# create DV
+dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',')
+dev4 <- devnetwork(DF, 4) # add here type of node
+
+# modified and added network
+dev4_a_raw <- dev4_raw[dev4_raw$action == "A",]
+dev4-a <- devnetwork_version(dev4_a_raw) # error: invalid vertex names
+
+dev4_m_raw <- dev4_raw[dev4_raw$action == "M",]
+
+# finish later do later
+
+# quick visualization
+library(ggraph)
+dev4g<- graph.adjacency(dev4, mode='undirected', weighted=T)
+
+ggraph(dev4g, layout='kk') + 
+  geom_edge_link(aes(start_cap = label_rect(node1.name),
+                     end_cap = label_rect(node2.name)), 
+                 arrow = arrow(length = unit(4, 'mm'))) + 
+  geom_node_label(aes(label = name)) + 
+  theme_graph()
+#not the nicest. 
+#one arrow with no label
+V(dev4g)$'name'
+dev4g
+
+# needed coordination network
+task4 <- read.csv('data/file-by-file/file-by-file_1.5.csv', header=T, sep=",")
+head(task4)
+
+# create ownership file
+# the ownership file structure provides info about which developers should be taking with each other
+own <- DF[,c(1,2,40)]
+dim(own)
+#table(own[,2] == own[,3])
+own <- own[!duplicated(own[,2]),]
+dim(own)
+
+library(pathological)
+#get the folders
+own$folder_names <- decompose_path(own[,2])[,2]
+
+
+tmp2 <- NULL
+for (i in 1:nrow(DF)){
+  tmp <- decompose_path(DF[i,2])[,1]
+  tmp2 <- c(tmp2, tmp)
+}
+
+DF$folder_names <- tmp2
+
+# definition ownership: the one who first created the folder
+ownership <- DF[!duplicated(DF$folder_names), c(1,42)]
+ownership <- ownership[,c(2,1)]
+
+folder_owner <- NULL
+for (i in 1:nrow(DF)){
+  tmp_foldername <- DF[i, 42]
+  tmp_folder_owner <- ownership[ownership$folder_names == tmp_foldername,2]
+  folder_owner <- c(folder_owner, tmp_folder_owner)
+}
+
+DF$folder_owner <- folder_owner
+
+ggplot(DF, aes(x = folder_owner, fill = ver)) + geom_bar() + 
+  scale_fill_brewer(type="qual")+
+  coord_flip()
+ggsave("onwership_frequency.png")
+
+# in the file file-by-file replace the file_id with the owner's name
+head(task4)
+
+req_communication <- task4[,c(1:2)] #data frame that needs to be converted
+ownership4 <- DF[DF$ver == 4, c(7, 43)] #lookup table
+req_communication[] <- ownership4$folder_owner[match(
+  unlist(req_communication), ownership4$ID_File_und)]
+
+
+
+
+
+# the developers who worked on a file (id number)
+file_author <- dev4_raw[,c(1,7)]
+head(file_author)
+ggplot(file_author, aes(x = author)) + geom_bar() + coord_flip()
+ggsave("developer_total_activity_ver4.png")
 
 
 
