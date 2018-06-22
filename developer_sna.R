@@ -25,17 +25,21 @@ myFiles = list.files(path="~/Documents/gitrepo/developer_sna/data/developer-by-f
                      pattern="*.csv", full.names = T)
 DF <- NULL
 for (f in myFiles) {
-  dat <- read.csv(f, header=T, sep=",", na.strings="", colClasses="character")
+  dat <- read.csv(f, header=T, sep=",", na.strings="", stringsAsFactors = F)
   dat$file <- unlist(strsplit(f,split=".",fixed=T))[1]
   DF <- rbind(DF, dat)
 }
+
+# take out files with no ID number. Error with Understand
+
+DF <- DF[-which(is.na(DF$ID_File_und)),]
 
 #load the task dependencies
 myFiles2 = list.files(path="~/Documents/gitrepo/developer_sna/data/file-by-file", 
                      pattern="*.csv", full.names = T)
 DF2 <- NULL
 for (f in myFiles2) {
-  dat <- read.csv(f, header=T, sep=",", na.strings="", colClasses="character")
+  dat <- read.csv(f, header=T, sep=",", na.strings="", stringsAsFactors = F)
   dat$file <- unlist(strsplit(f,split=".",fixed=T))[1]
   DF2 <- rbind(DF2, dat)
 }
@@ -44,6 +48,7 @@ for (f in myFiles2) {
 authatt <- read.csv("~/Documents/gitrepo/developer_sna/data/authors_022018.csv", sep=",", header=T)
 
 
+# take care. check structure. lots of variables read as characters
 # create DV network -------------------------------------------------------
 
 # DF is edgelist (instance list) in the format: author - file 
@@ -747,7 +752,9 @@ mcmc.diagnostics(t2m4.16)
 # in the folder, but not the subfolders
 
 # create DV
-dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',')
+dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',', stringsAsFactors = F)
+str(dev4_raw)
+
 dev4 <- devnetwork(DF, 4) # add here type of node
 
 # modified and added network
@@ -756,12 +763,19 @@ dev4-a <- devnetwork_version(dev4_a_raw) # error: invalid vertex names
 
 dev4_m_raw <- dev4_raw[dev4_raw$action == "M",]
 
-# finish later do later
+# finish later 
+
+# visualization -----------------------------------------------------------
+
 
 # quick visualization
 library(ggraph)
 dev4g<- graph.adjacency(dev4, mode='undirected', weighted=T)
 
+#quick visualization with igraph
+plot(dev4g)
+
+# customized visualization with ggraph
 ggraph(dev4g, layout='kk') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
@@ -773,68 +787,110 @@ ggraph(dev4g, layout='kk') +
 V(dev4g)$'name'
 dev4g
 
+
+# coordination - ownership network ----------------------------------------
+
+
 # needed coordination network
-task4 <- read.csv('data/file-by-file/file-by-file_1.5.csv', header=T, sep=",")
+task4 <- read.csv('../data/file-by-file/file-by-file_1.5.csv', header=T, sep=",", stringsAsFactors = F)
 head(task4)
-
+str(task4)
+View(task4)
 # create ownership file
-# the ownership file structure provides info about which developers should be taking with each other
-own <- DF[,c(1,2,40)]
+# the ownership file structure provides info about which developers should 
+# be taking with each other
+# workflow: 
+# 1. using the developer-by-file file get the people who create a file (action = A)
+# 2. check and remove any duplicate folder structure
+# 3. extract the folder structure
+own <- DF[DF$action == 'A',c(1,40)] # ME: Use filename column with short filenames
 dim(own)
-#table(own[,2] == own[,3])
-own <- own[!duplicated(own[,2]),]
-dim(own)
-
+table(duplicated(own[,2]))
+own <- own[!duplicated(own[,2]),] # remove duplicates
 library(pathological)
-#get the folders
-own$folder_names <- decompose_path(own[,2])[,2]
 
+get_folder_name <- function(x){
+  x <- pathological::decompose_path(x)
+  x <- x[,1]
+  x <- gsub('/Users/katerinadoyle/Documents/gitrepo/developer_sna/analysis/',
+            '', x)[1]
+  return(x)
+}
+own$folder_names <- unlist(lapply(own[,2], get_folder_name)) # returns the foldername
 
+# remove duplicates from the folder_names file. The first instance is always kept
+# this will be the folder owner
+own <- own[!duplicated(own[,3]),]
+
+# add to DF one column with folder_names
+# the function decompose_path throws an error if there are dupliate folder 
+# names. to avoid this, loop over folder names, create vector with names
+# and add to DF 
 tmp2 <- NULL
 for (i in 1:nrow(DF)){
-  tmp <- decompose_path(DF[i,2])[,1]
+  tmp <- get_folder_name(DF[i,40])
   tmp2 <- c(tmp2, tmp)
 }
 
 DF$folder_names <- tmp2
 
-# definition ownership: the one who first created the folder
-ownership <- DF[!duplicated(DF$folder_names), c(1,42)]
-ownership <- ownership[,c(2,1)]
-
+# Add folder_owner to the file DF
 folder_owner <- NULL
 for (i in 1:nrow(DF)){
+  # get the folder name from the developer-by-file file
   tmp_foldername <- DF[i, 42]
-  tmp_folder_owner <- ownership[ownership$folder_names == tmp_foldername,2]
+  # match the folder name from step 1 with the folder name from the own object,
+  # and return the name of the folder owner
+  # assignes the name of the folder owner to the temporary object tmp_flder_owner
+  if (length(own[own$folder_names == tmp_foldername,1])==0){tmp_folder_owner <- 'error'}
+  else{
+  tmp_folder_owner <- own[own$folder_names == tmp_foldername,1]
+  }
+  # add the folder owner to a new vector
   folder_owner <- c(folder_owner, tmp_folder_owner)
 }
 
 DF$folder_owner <- folder_owner
 
-ggplot(DF, aes(x = folder_owner, fill = ver)) + geom_bar() + 
-  scale_fill_brewer(type="qual")+
-  coord_flip()
-ggsave("onwership_frequency.png")
+ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() + 
+  scale_fill_brewer(type="qual", guide=guide_legend(title="Version Number")) +
+  coord_flip() + 
+  labs("Ownership distribution by software version", 
+          x = 'Frequency', y = 'Developer')
+ggsave("onwership_frequency_all_versions.png")
 
-# in the file file-by-file replace the file_id with the owner's name
+# Create network of required coordination based
+# file file-by-file are the technical dependencies between software files
+# task4 show the technical dependencies for version 4
+# the id's in task 4 are unique per version
+# question: if a file wasn't modified it is not listed in developer-by-file, but in file-by-file
+# and the id in file-by-file is not the same than the file would have had in the previous version
+# if yes, How do I know the owner of that
+# 
+# goal: in task4 replace the file_id with the owner's name
 head(task4)
+#data frame that needs to be converted
+req_communication <- task4[,c(1:2)]
+# this is the lookup table, containing the ID
+# and the folder owner name
 
-req_communication <- task4[,c(1:2)] #data frame that needs to be converted
-ownership4 <- DF[DF$ver == 4, c(7, 43)] #lookup table
-req_communication[] <- ownership4$folder_owner[match(
-  unlist(req_communication), ownership4$ID_File_und)]
+ownership_withid <- DF[ ,c(7, 43)] 
+# 
+# It needs to be the complete dataset (DF) for when a file hasn't been modified in this
+# version. if the file hasn't been modified in ver4, it will not be shown in 
+# dev4_raw. This will result in NA for when matching needed and required 
+# communication
+req_communication[] <- ownership_withid$folder_owner[match(
+  unlist(req_communication), ownership_withid$ID_File_und)]
+req_communication$weight <- task4[,3]
 
+which(DF$ID_File_und == 36927, )
 
+# this is 0 because the file with the ID 135895 wasn't modified in ver4
+max(DF$ID_File_und, na.rm=T)
 
-
-
-# the developers who worked on a file (id number)
-file_author <- dev4_raw[,c(1,7)]
-head(file_author)
-ggplot(file_author, aes(x = author)) + geom_bar() + coord_flip()
-ggsave("developer_total_activity_ver4.png")
-
-
+head(req_communication)
+head(task4)
 
 
 # failed models -----------------------------------------------------------
