@@ -743,28 +743,6 @@ mcmc.diagnostics(t2m4.16)
 # continue t2m12d with higher burnout? that should reduce geweke stats, but what about convergence
 
 
-# analysis v4 -------------------------------------------------------------
-
-# testing of non-mirroring hypothesis
-# dependent network: developer-by-developer (realized coordination)
-# IV-1: needed coordination based on task dependencies
-# IV-2: ownership dependencies: the one who created the folder owns the files
-# in the folder, but not the subfolders
-
-# create DV
-dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',', stringsAsFactors = F)
-str(dev4_raw)
-
-dev4 <- devnetwork(DF, 4) # add here type of node
-
-# modified and added network
-dev4_a_raw <- dev4_raw[dev4_raw$action == "A",]
-dev4-a <- devnetwork_version(dev4_a_raw) # error: invalid vertex names
-
-dev4_m_raw <- dev4_raw[dev4_raw$action == "M",]
-
-# finish later 
-
 # visualization -----------------------------------------------------------
 
 
@@ -803,6 +781,45 @@ View(task4)
 # 1. using the developer-by-file file get the people who create a file (action = A)
 # 2. check and remove any duplicate folder structure
 # 3. extract the folder structure
+# 
+# exploration: changes in team membership
+
+ggplot(authatt, aes(x = author)) + geom_bar() + coord_flip() + facet_wrap(~ ver) + labs(title="Membership for each Version")
+ggsave('developer_per_version.png')
+ggplot(authatt, aes(x = ver)) + geom_bar() + coord_flip() + facet_wrap(~ author) + labs("Version participation")
+ggsave("Version_per_developer.png")
+
+df <- authatt[,c(1:2)]
+names(df) <- c('group', 'person')
+library(igraph)
+library('Matrix')
+A <- spMatrix(nrow=length(unique(df$person)),
+        ncol=length(unique(df$group)),
+        i = as.numeric(factor(df$person)),
+        j = as.numeric(factor(df$group)),
+        x = rep(1, length(as.numeric(df$person))) )
+row.names(A) <- levels(factor(df$person))
+colnames(A) <- levels(factor(df$group))
+A
+ownership_sequence <- reshape2::melt(as.matrix(A))
+ownership_sequence[ownership_sequence$value == 0, 3] <- 'Not a member'
+ownership_sequence[ownership_sequence$value == 1, 3] <- 'Member'
+ggplot(ownership_sequence, aes(x = Var2, y = Var1)) + 
+  guides(fill=guide_legend(title="Membership")) +
+  geom_tile(aes(fill= as.factor(value))) + labs(title="Membership turnover", 
+                                                x = "Version", 
+                                                y = "Developers")
+ggsave("membership_heatmap.png")
+
+aut_ver <- graph.incidence(A)
+V(aut_ver)$type <-c(rep('TRUE',21),rep("FALSE", 13) )
+V(aut_ver)$color <- V(aut_ver)$type
+V(aut_ver)$color=gsub("TRUE","red",V(aut_ver)$color)
+V(aut_ver)$color=gsub("FALSE","blue",V(aut_ver)$color)
+plot(aut_ver, edge.color="gray30", layout=layout_as_bipartite)
+
+# define ownership
+# 
 own <- DF[DF$action == 'A',c(1,40)] # ME: Use filename column with short filenames
 dim(own)
 table(duplicated(own[,2]))
@@ -859,6 +876,16 @@ ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() +
           x = 'Frequency', y = 'Developer')
 ggsave("onwership_frequency_all_versions.png")
 
+
+# per folder and version, calculate how much a developer contributed
+
+
+
+
+
+
+
+
 # Create network of required coordination based
 # file file-by-file are the technical dependencies between software files
 # task4 show the technical dependencies for version 4
@@ -893,50 +920,27 @@ head(req_communication)
 head(task4)
 
 
-# failed models -----------------------------------------------------------
+# analysis v4 -------------------------------------------------------------
 
+# testing of non-mirroring hypothesis
+# dependent network: developer-by-developer (realized coordination)
+# IV-1: needed coordination based on task dependencies
+# IV-2: ownership dependencies: the one who created the folder owns the files
+# in the folder, but not the subfolders
 
-t2m5 <-  ergm(developer_net ~ sum + nonzero()
-              #+ nodematch("loc") + nodematch("title") # homophily theory
-              + nodesqrtcovar(center=T)
-              + transitiveweights("min","max","min")
-               + cyclicalweights("min","max","min")
-              , response="frequency", reference=~Geometric)
-# error Error in eigen(crossprod(x1c), symmetric = TRUE) : 
-# infinite or missing values in 'x'
-# nonzero has NA as estimate. take out?
-# 
-# pdf("t2m5.pdf")
-# mcmc.diagnostics(t2m5)
-# dev.off()
+# create DV
+dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',', stringsAsFactors = F)
+str(dev4_raw)
 
-t2m6 <-  ergm(developer_net ~ sum# + nonzero()
-              #+ nodematch("loc") + nodematch("title") # homophily theory
-              + nodesqrtcovar(center=T)
-              + transitiveweights("min","max","min")
-              + cyclicalweights("min","max","min")
-              , response="frequency", reference=~Geometric)
+dev4 <- devnetwork(DF, 4) # add here type of node
 
-t2m7 <-  ergm(developer_net ~ sum# + nonzero()
-              #+ nodematch("loc") + nodematch("title") # homophily theory
-              + nodesqrtcovar(center=T)
-              + transitiveweights("min", "max", "min")
-              #+ cyclicalweights("min","max","min")
-              , response="frequency", reference=~Geometric)
+# modified and added network
+dev4_a_raw <- dev4_raw[dev4_raw$action == "A",]
+dev4-a <- devnetwork_version(dev4_a_raw) # error: invalid vertex names
 
+dev4_m_raw <- dev4_raw[dev4_raw$action == "M",]
 
-t2m7 <-  ergm(developer_net ~ sum + nonzero()
-              #+ nodematch("loc") + nodematch("title") # homophily theory
-              + nodesqrtcovar(center=T)
-              + transitiveweights("min","max","min")
-              + cyclicalweights("min","max","min")
-              , response="frequency", reference=~Geometric)
-pdf("t2m6.pdf")
-summary(t2m6)
-mcmc.diagnostics(t2m6)
-dev.off()
-
-
+# finish later 
 # Task 3 ------------------------------------------------------------------
 # longitudinal
 
