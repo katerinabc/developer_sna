@@ -818,13 +818,17 @@ V(aut_ver)$color=gsub("TRUE","red",V(aut_ver)$color)
 V(aut_ver)$color=gsub("FALSE","blue",V(aut_ver)$color)
 plot(aut_ver, edge.color="gray30", layout=layout_as_bipartite)
 
-# define ownership
-# 
-own <- DF[DF$action == 'A',c(1,40)] # ME: Use filename column with short filenames
+
+# define ownership --------------------------------------------------------
+
+own <- DF[DF$action == 'A',c(1,39, 40)] # ME: Use filename column with short filenames
 dim(own)
+own <- own[order(own$ID_rev),]
 table(duplicated(own[,2]))
 own <- own[!duplicated(own[,2]),] # remove duplicates
 library(pathological)
+
+own <- own[,-2]
 
 get_folder_name <- function(x){
   x <- pathological::decompose_path(x)
@@ -833,10 +837,14 @@ get_folder_name <- function(x){
             '', x)[1]
   return(x)
 }
+
 own$folder_names <- unlist(lapply(own[,2], get_folder_name)) # returns the foldername
+
+# TOD: check if it correctly identifies file names without a file. when someone creates a folder
 
 # remove duplicates from the folder_names file. The first instance is always kept
 # this will be the folder owner
+
 own <- own[!duplicated(own[,3]),]
 
 # add to DF one column with folder_names
@@ -860,6 +868,7 @@ for (i in 1:nrow(DF)){
   # and return the name of the folder owner
   # assignes the name of the folder owner to the temporary object tmp_flder_owner
   if (length(own[own$folder_names == tmp_foldername,1])==0){tmp_folder_owner <- 'error'}
+  # error added when folder owner not found in previous version
   else{
   tmp_folder_owner <- own[own$folder_names == tmp_foldername,1]
   }
@@ -878,13 +887,71 @@ ggsave("onwership_frequency_all_versions.png")
 
 
 # per folder and version, calculate how much a developer contributed
+# make sure to take care of the two software branches
+# 
+# 
+folder_contribution <- reshape2::melt(table(DF[,c(1,42)]))
+head(folder_contribution)
+folder_contribution$folder_names <- stringr::str_sub(folder_contribution$folder_names, start= -5)
+folder_contribution <- folder_contribution[-which(folder_contribution$value == 0),]
+dim(folder_contribution)
+ggplot(folder_contribution, aes(x = author, y = folder_names)) + 
+  geom_tile(aes(fill = value)) + labs(title="Developer contribution to folders", 
+                                      x = 'Developers',
+                                      y = 'Folder Names') +
+  theme(axis.text.x = element_text(angle=45, hjust = 1))
+ggsave("developer_contribution_per_folder.png")
+
+ggplot(folder_contribution, aes(value)) + geom_bar() + facet_wrap(~author)
+ggsave("facet_wrap_developer_contribution_per_folder.png")
+
+# create ownership of folders per version.
+# ownership can not be re-gained
+# workflow: 
+# 1. take subset of folders with modification in version x
+own_ver1 <- DF[DF$ver == 1,c(40, 42:43, 1)]
+own_ver2 <- DF[DF$ver == 2,c(40, 42:43,1)]
+own_ver2$new_owner <- own_ver2$folder_owner
+
+# 2. find FO and FN
+for (i in 1:nrow(own_ver2)){
+tmp_folder <- own_ver2[i,2] # get the folder name (FN) and owner (FO) from version X
+tmp_owner <- own_ver2[i,3]
+
+# 3. check if owner has been assigned
+if (tmp_owner == "error"){
+own_ver2[own_ver2$folder_names == tmp_folder, 5] <- own_ver2[i,4]
+next
+}
+#if(tmp_owner =="error"){next}
+
+# 4. Is FO member in version x
+auth_ver2 <- authatt[authatt$ver ==2,2] # subset autatt for members in version x
+if(tmp_owner %in% auth_ver2){# check if FO in version x-1
+  
+  # 5: Yes, FO member for version x. Check if FO also owner of FN in version x-1
+  tmp_prev_owner <- own_ver1[own_ver1$folder_names == tmp_folder, 3]
+  print(length(unique(tmp_prev_owner)) == 1) #check for unique FO
+  # check if FO(x-1) == FO(x)
+  check <- tmp_prev_owner == tmp_owner
+  if (check == T){next} # if FO member in version x, and owner of FN in version x-1, go to next row
+else {# else statement for step 5
+  
+  }
+  }
+else{ # else statement for check at step 4
+  dgdsfggfsf
+}
+# 5. if owner assigned in version x-1 and member in version x, copy ownership ??
+
+# 6. if owner assigned in version x-1, but not member in version x, transfer ownership
+own_ver2[own_ver2$folder_names == tmp_folder, 5] <- tmp_prev_owner[1]
+}
 
 
 
 
-
-
-
+ 
 
 # Create network of required coordination based
 # file file-by-file are the technical dependencies between software files
