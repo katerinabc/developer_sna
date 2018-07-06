@@ -828,6 +828,7 @@ table(duplicated(own[,2]))
 own <- own[!duplicated(own[,2]),] # remove duplicates
 library(pathological)
 
+names(own)
 own <- own[,-2]
 
 get_folder_name <- function(x){
@@ -844,8 +845,11 @@ own$folder_names <- unlist(lapply(own[,2], get_folder_name)) # returns the folde
 
 # remove duplicates from the folder_names file. The first instance is always kept
 # this will be the folder owner
-
+dim(own)
+head(own)
 own <- own[!duplicated(own[,3]),]
+dim(own)
+head(own)
 
 # add to DF one column with folder_names
 # the function decompose_path throws an error if there are dupliate folder 
@@ -860,6 +864,10 @@ for (i in 1:nrow(DF)){
 DF$folder_names <- tmp2
 
 # Add folder_owner to the file DF
+# 
+# 
+# ERROR IN HERE ? Some owners are not part of version 1
+
 folder_owner <- NULL
 for (i in 1:nrow(DF)){
   # get the folder name from the developer-by-file file
@@ -878,6 +886,39 @@ for (i in 1:nrow(DF)){
 
 DF$folder_owner <- folder_owner
 
+# create a logical vector indicating if FO is member in the project version
+#folder owner member of version
+#
+#error: sometimes a member is classfied as member true/false
+members_vec <- NULL
+for (i in 1:9){
+  #print(i)
+  tmp_owner <- DF[DF$ver == i, 43]
+  #print(length(tmp_owner))
+  tmp_members <- authatt[authatt$ver == i, 2]
+  tmp_mem_idx <- which(tmp_owner %in% tmp_members) 
+  # if using which to get row numbers I get a vector of length = 3028. these are the matches
+  #print(length(tmp_mem_idx))
+  members_vec <- c(members_vec, tmp_mem_idx)
+}
+
+members_vec <- NULL
+for (i in 1:nrow(DF)){
+  tmp_owner <- DF[i, 43]
+  tmp_version <- DF[i, 6]
+  if(tmp_owner %in% authatt[authatt$ver == tmp_version,2]){
+    tmp_member <- TRUE
+  }
+  else{
+    tmp_member <- FALSE
+  }
+  members_vec <- c(members_vec, tmp_member)
+}
+
+length(members_vec)
+
+DF$members <- members_vec
+
 ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() + 
   scale_fill_brewer(type="qual", guide=guide_legend(title="Version Number")) +
   coord_flip() + 
@@ -885,10 +926,8 @@ ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() +
           x = 'Frequency', y = 'Developer')
 ggsave("onwership_frequency_all_versions.png")
 
-
 # per folder and version, calculate how much a developer contributed
 # make sure to take care of the two software branches
-# 
 # 
 folder_contribution <- reshape2::melt(table(DF[,c(1,42)]))
 head(folder_contribution)
@@ -909,49 +948,44 @@ ggsave("facet_wrap_developer_contribution_per_folder.png")
 # ownership can not be re-gained
 # workflow: 
 # 1. take subset of folders with modification in version x
-own_ver1 <- DF[DF$ver == 1,c(40, 42:43, 1)]
-own_ver2 <- DF[DF$ver == 2,c(40, 42:43,1)]
-own_ver2$new_owner <- own_ver2$folder_owner
+#own <- DF[,c(1, 3, 6, 39,40,42,43)]
+DF$folder_owner <- as.character(DF$folder_owner)
 
-# 2. find FO and FN
-for (i in 1:nrow(own_ver2)){
-tmp_folder <- own_ver2[i,2] # get the folder name (FN) and owner (FO) from version X
-tmp_owner <- own_ver2[i,3]
+authatt$author <- as.character(authatt$author)
 
-# 3. check if owner has been assigned
-if (tmp_owner == "error"){
-own_ver2[own_ver2$folder_names == tmp_folder, 5] <- own_ver2[i,4]
-next
-}
-#if(tmp_owner =="error"){next}
+# how often has a developer be assigned to a folder, but isn't member in that version
+table(DF$folder_owner, DF$members)
 
-# 4. Is FO member in version x
-auth_ver2 <- authatt[authatt$ver ==2,2] # subset autatt for members in version x
-if(tmp_owner %in% auth_ver2){# check if FO in version x-1
-  
-  # 5: Yes, FO member for version x. Check if FO also owner of FN in version x-1
-  tmp_prev_owner <- own_ver1[own_ver1$folder_names == tmp_folder, 3]
-  print(length(unique(tmp_prev_owner)) == 1) #check for unique FO
-  # check if FO(x-1) == FO(x)
-  check <- tmp_prev_owner == tmp_owner
-  if (check == T){next} # if FO member in version x, and owner of FN in version x-1, go to next row
-else {# else statement for step 5
-  
-  }
-  }
-else{ # else statement for check at step 4
-  dgdsfggfsf
-}
-# 5. if owner assigned in version x-1 and member in version x, copy ownership ??
+#top contributor per version per folder
+library(dplyr)
+# look up table
+contr_now <- DF %>% group_by(ver, folder_names, author) %>% summarize(contribution = n())
+contr_now <- as.data.frame(contr_now %>%group_by(ver, folder_names) %>% top_n(1, contribution))
 
-# 6. if owner assigned in version x-1, but not member in version x, transfer ownership
-own_ver2[own_ver2$folder_names == tmp_folder, 5] <- tmp_prev_owner[1]
+idx_nonmembers <- which(DF$members == FALSE)
+
+# mistake: fabio.boldrin markes as nonmember in version 5, but he is
+DF$new_owner <- DF$folder_owner
+for (i in idx_nonmembers){
+  #print(i)
+  tmp_version <-DF[i,6]
+  tmp_folder <- DF[i, 42]
+  tmp_contributors <- contr_now[contr_now$ver == tmp_version,]
+  tmp_folder_contributor <- tmp_contributors[
+    tmp_contributors$folder_names == tmp_folder,3][1] # pick first developer when 2 tie in contribution
+  DF[i,44] <- tmp_folder_contributor
+
 }
 
+ownership_change <- reshape2::melt(table(DF$folder_owner, DF$new_owner))
+ownership_change <- ownership_change[-which(as.character(ownership_change$Var1) == 
+                                              as.character(ownership_change$Var2)),]
+ownership_change <- ownership_change[!ownership_change$value == 0,]
 
-
-
- 
+ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() + 
+  labs(title="Change in ownership of folders", x = 'Original Owner', y = 'New Owner') +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+ ggsave('ownership_change.png')
 
 # Create network of required coordination based
 # file file-by-file are the technical dependencies between software files
