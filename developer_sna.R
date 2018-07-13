@@ -1,8 +1,9 @@
 # Script for Collaboration Analysis
 # Research Owner: Mahdi
-# latest update: june 18th 
+# latest update: junly 10th 
 # 
 
+source('functions.R')
 # questions ---------------------------------------------------------------
 
 # actual communication patterns
@@ -49,93 +50,6 @@ authatt <- read.csv("~/Documents/gitrepo/developer_sna/data/authors_022018.csv",
 
 
 # take care. check structure. lots of variables read as characters
-# create DV network -------------------------------------------------------
-
-# DF is edgelist (instance list) in the format: author - file 
-bg <- graph.empty(directed = F)
-node.out <- unique(DF$author) 
-node.in <- unique(DF$Filename) 
-bg <- add.vertices(bg,nv=length(node.out),attr=list(name=node.out),type=rep(FALSE,length(node.out)))
-bg <- add.vertices(bg,nv=length(node.in),attr=list(name=node.in),type=rep(TRUE,length(node.in)))
-edge.list.vec <- as.vector(t(as.matrix(data.frame(DF[,c(1:2)]))))
-bg <- add.edges(bg,edge.list.vec)
-bg
-View(get.incidence(bg))
-
-pr <- bipartite.projection(bg) 
-
-developer <- get.adjacency(pr$proj1,sparse=FALSE,attr="weight")
-tasks <- get.adjacency(pr$proj2,sparse=FALSE,attr="weight")
-
-# developer network
-# function to get network data for one software version
-devnetwork <- function(dataset, version_number=NULL){
-  require(igraph, quietly=T)
-  small_subset <- dataset[dataset$ver == version_number,]
-  bg <- graph.empty(directed = F)
-  node.out <- unique(small_subset$author) 
-  node.in <- unique(small_subset$Filename) 
-  bg <- add.vertices(bg,nv=length(node.out),attr=list(name=node.out),type=rep(FALSE,length(node.out)))
-  bg <- add.vertices(bg,nv=length(node.in),attr=list(name=node.in),type=rep(TRUE,length(node.in)))
-  edge.list.vec <- as.vector(t(as.matrix(data.frame(small_subset[,c(1:2)]))))
-  bg <- add.edges(bg,edge.list.vec)
-  pr <- bipartite.projection(bg) 
-  return(get.adjacency(pr$proj1,sparse=FALSE,attr="weight"))
-}
-
-devnetwork_version <- function(dataset){
-  require(igraph, quietly=T)
-  bg <- graph.empty(directed = F)
-  node.out <- unique(dataset$author) 
-  node.in <- unique(dataset$Filename) 
-  bg <- add.vertices(bg,nv=length(node.out),attr=list(name=node.out),type=rep(FALSE,length(node.out)))
-  bg <- add.vertices(bg,nv=length(node.in),attr=list(name=node.in),type=rep(TRUE,length(node.in)))
-  edge.list.vec <- as.vector(t(as.matrix(data.frame(dataset[,c(1:2)]))))
-  bg <- add.edges(bg,edge.list.vec)
-  pr <- bipartite.projection(bg) 
-  return(get.adjacency(pr$proj1,sparse=FALSE,attr="weight"))
-}
-
-
-draw_dev_net <- function(network, )
-dev_v1 <- devnetwork(DF, 1)
-
-
-# Add attributes to developer network -------------------------------------
-
-#check if name in author att same order as in network file
-match(rownames(developer), authatt$author) #not a match. sort authatt file
-authatt <- authatt[match(row.names(developer), authatt$author),]
-
-developer_net <- network(developer, directed=F, matrix.type="a",ignore.eval=FALSE, names.eval="frequency")
-
-developer_net%v%"id" <- authatt$ID_author
-developer_net%v%"title" <- authatt$jobtitle_raw
-developer_net%v%"loc" <- authatt$location
-developer_net%v%"contract" <- authatt$contract
-
-# visualization -----------------------------------------------------------
-library(igraph)
-library(ggraph)
-
-#better in Gephi for complete data ?
-
-names(DF2)
-g2 <- graph.adjacency(dev_v1, mode="directed", weighted=TRUE)
-g2
-
-ggraph(g2) + # raw depiction. improve for publication
-  geom_edge_link(aes(edge_width = weight)) + #width = size arguemtn?
-  geom_node_point()
-
-dev_igraph <- graph.adjacency(developer, weighted=T)
-V(dev_igraph)$location <- authatt$location
-V(dev_igraph)$title <- authatt$jobtitle_raw
-
-ggraph(dev_igraph) + 
-  geom_edge_link(aes(edge_width = weight/1000)) + 
-  geom_node_point(aes(shape = as.factor(location), color = as.factor(title)))
-ggsave("developer_1_mode_projection.png")
 
 # Network description -----------------------------------------------------
 
@@ -743,284 +657,6 @@ mcmc.diagnostics(t2m4.16)
 # continue t2m12d with higher burnout? that should reduce geweke stats, but what about convergence
 
 
-# visualization -----------------------------------------------------------
-
-
-# quick visualization
-library(ggraph)
-dev4g<- graph.adjacency(dev4, mode='undirected', weighted=T)
-
-#quick visualization with igraph
-plot(dev4g)
-
-# customized visualization with ggraph
-ggraph(dev4g, layout='kk') + 
-  geom_edge_link(aes(start_cap = label_rect(node1.name),
-                     end_cap = label_rect(node2.name)), 
-                 arrow = arrow(length = unit(4, 'mm'))) + 
-  geom_node_label(aes(label = name)) + 
-  theme_graph()
-#not the nicest. 
-#one arrow with no label
-V(dev4g)$'name'
-dev4g
-
-
-# coordination - ownership network ----------------------------------------
-
-
-# needed coordination network
-task4 <- read.csv('../data/file-by-file/file-by-file_1.5.csv', header=T, sep=",", stringsAsFactors = F)
-head(task4)
-str(task4)
-View(task4)
-# create ownership file
-# the ownership file structure provides info about which developers should 
-# be taking with each other
-# workflow: 
-# 1. using the developer-by-file file get the people who create a file (action = A)
-# 2. check and remove any duplicate folder structure
-# 3. extract the folder structure
-# 
-# exploration: changes in team membership
-
-ggplot(authatt, aes(x = author)) + geom_bar() + coord_flip() + facet_wrap(~ ver) + labs(title="Membership for each Version")
-ggsave('developer_per_version.png')
-ggplot(authatt, aes(x = ver)) + geom_bar() + coord_flip() + facet_wrap(~ author) + labs("Version participation")
-ggsave("Version_per_developer.png")
-
-df <- authatt[,c(1:2)]
-names(df) <- c('group', 'person')
-library(igraph)
-library('Matrix')
-A <- spMatrix(nrow=length(unique(df$person)),
-        ncol=length(unique(df$group)),
-        i = as.numeric(factor(df$person)),
-        j = as.numeric(factor(df$group)),
-        x = rep(1, length(as.numeric(df$person))) )
-row.names(A) <- levels(factor(df$person))
-colnames(A) <- levels(factor(df$group))
-A
-ownership_sequence <- reshape2::melt(as.matrix(A))
-ownership_sequence[ownership_sequence$value == 0, 3] <- 'Not a member'
-ownership_sequence[ownership_sequence$value == 1, 3] <- 'Member'
-ggplot(ownership_sequence, aes(x = Var2, y = Var1)) + 
-  guides(fill=guide_legend(title="Membership")) +
-  geom_tile(aes(fill= as.factor(value))) + labs(title="Membership turnover", 
-                                                x = "Version", 
-                                                y = "Developers")
-ggsave("membership_heatmap.png")
-
-aut_ver <- graph.incidence(A)
-V(aut_ver)$type <-c(rep('TRUE',21),rep("FALSE", 13) )
-V(aut_ver)$color <- V(aut_ver)$type
-V(aut_ver)$color=gsub("TRUE","red",V(aut_ver)$color)
-V(aut_ver)$color=gsub("FALSE","blue",V(aut_ver)$color)
-plot(aut_ver, edge.color="gray30", layout=layout_as_bipartite)
-
-
-# define ownership --------------------------------------------------------
-
-own <- DF[DF$action == 'A',c(1,39, 40)] # ME: Use filename column with short filenames
-dim(own)
-own <- own[order(own$ID_rev),]
-table(duplicated(own[,2]))
-own <- own[!duplicated(own[,2]),] # remove duplicates
-library(pathological)
-
-names(own)
-own <- own[,-2]
-
-get_folder_name <- function(x){
-  x <- pathological::decompose_path(x)
-  x <- x[,1]
-  x <- gsub('/Users/katerinadoyle/Documents/gitrepo/developer_sna/analysis/',
-            '', x)[1]
-  return(x)
-}
-
-own$folder_names <- unlist(lapply(own[,2], get_folder_name)) # returns the foldername
-
-# TOD: check if it correctly identifies file names without a file. when someone creates a folder
-
-# remove duplicates from the folder_names file. The first instance is always kept
-# this will be the folder owner
-dim(own)
-head(own)
-own <- own[!duplicated(own[,3]),]
-dim(own)
-head(own)
-
-# add to DF one column with folder_names
-# the function decompose_path throws an error if there are dupliate folder 
-# names. to avoid this, loop over folder names, create vector with names
-# and add to DF 
-tmp2 <- NULL
-for (i in 1:nrow(DF)){
-  tmp <- get_folder_name(DF[i,40])
-  tmp2 <- c(tmp2, tmp)
-}
-
-DF$folder_names <- tmp2
-
-# Add folder_owner to the file DF
-# 
-# 
-# ERROR IN HERE ? Some owners are not part of version 1
-
-folder_owner <- NULL
-for (i in 1:nrow(DF)){
-  # get the folder name from the developer-by-file file
-  tmp_foldername <- DF[i, 42]
-  # match the folder name from step 1 with the folder name from the own object,
-  # and return the name of the folder owner
-  # assignes the name of the folder owner to the temporary object tmp_flder_owner
-  if (length(own[own$folder_names == tmp_foldername,1])==0){tmp_folder_owner <- 'error'}
-  # error added when folder owner not found in previous version
-  else{
-  tmp_folder_owner <- own[own$folder_names == tmp_foldername,1]
-  }
-  # add the folder owner to a new vector
-  folder_owner <- c(folder_owner, tmp_folder_owner)
-}
-
-DF$folder_owner <- folder_owner
-
-# create a logical vector indicating if FO is member in the project version
-#folder owner member of version
-#
-#error: sometimes a member is classfied as member true/false
-members_vec <- NULL
-for (i in 1:9){
-  #print(i)
-  tmp_owner <- DF[DF$ver == i, 43]
-  #print(length(tmp_owner))
-  tmp_members <- authatt[authatt$ver == i, 2]
-  tmp_mem_idx <- which(tmp_owner %in% tmp_members) 
-  # if using which to get row numbers I get a vector of length = 3028. these are the matches
-  #print(length(tmp_mem_idx))
-  members_vec <- c(members_vec, tmp_mem_idx)
-}
-
-members_vec <- NULL
-for (i in 1:nrow(DF)){
-  tmp_owner <- DF[i, 43]
-  tmp_version <- DF[i, 6]
-  if(tmp_owner %in% authatt[authatt$ver == tmp_version,2]){
-    tmp_member <- TRUE
-  }
-  else{
-    tmp_member <- FALSE
-  }
-  members_vec <- c(members_vec, tmp_member)
-}
-
-length(members_vec)
-
-DF$members <- members_vec
-
-ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() + 
-  scale_fill_brewer(type="qual", guide=guide_legend(title="Version Number")) +
-  coord_flip() + 
-  labs("Ownership distribution by software version", 
-          x = 'Frequency', y = 'Developer')
-ggsave("onwership_frequency_all_versions.png")
-
-# per folder and version, calculate how much a developer contributed
-# make sure to take care of the two software branches
-# 
-folder_contribution <- reshape2::melt(table(DF[,c(1,42)]))
-head(folder_contribution)
-folder_contribution$folder_names <- stringr::str_sub(folder_contribution$folder_names, start= -5)
-folder_contribution <- folder_contribution[-which(folder_contribution$value == 0),]
-dim(folder_contribution)
-ggplot(folder_contribution, aes(x = author, y = folder_names)) + 
-  geom_tile(aes(fill = value)) + labs(title="Developer contribution to folders", 
-                                      x = 'Developers',
-                                      y = 'Folder Names') +
-  theme(axis.text.x = element_text(angle=45, hjust = 1))
-ggsave("developer_contribution_per_folder.png")
-
-ggplot(folder_contribution, aes(value)) + geom_bar() + facet_wrap(~author)
-ggsave("facet_wrap_developer_contribution_per_folder.png")
-
-# create ownership of folders per version.
-# ownership can not be re-gained
-# workflow: 
-# 1. take subset of folders with modification in version x
-#own <- DF[,c(1, 3, 6, 39,40,42,43)]
-DF$folder_owner <- as.character(DF$folder_owner)
-
-authatt$author <- as.character(authatt$author)
-
-# how often has a developer be assigned to a folder, but isn't member in that version
-table(DF$folder_owner, DF$members)
-
-#top contributor per version per folder
-library(dplyr)
-# look up table
-contr_now <- DF %>% group_by(ver, folder_names, author) %>% summarize(contribution = n())
-contr_now <- as.data.frame(contr_now %>%group_by(ver, folder_names) %>% top_n(1, contribution))
-
-idx_nonmembers <- which(DF$members == FALSE)
-
-# mistake: fabio.boldrin markes as nonmember in version 5, but he is
-DF$new_owner <- DF$folder_owner
-for (i in idx_nonmembers){
-  #print(i)
-  tmp_version <-DF[i,6]
-  tmp_folder <- DF[i, 42]
-  tmp_contributors <- contr_now[contr_now$ver == tmp_version,]
-  tmp_folder_contributor <- tmp_contributors[
-    tmp_contributors$folder_names == tmp_folder,3][1] # pick first developer when 2 tie in contribution
-  DF[i,44] <- tmp_folder_contributor
-
-}
-
-ownership_change <- reshape2::melt(table(DF$folder_owner, DF$new_owner))
-ownership_change <- ownership_change[-which(as.character(ownership_change$Var1) == 
-                                              as.character(ownership_change$Var2)),]
-ownership_change <- ownership_change[!ownership_change$value == 0,]
-
-ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() + 
-  labs(title="Change in ownership of folders", x = 'Original Owner', y = 'New Owner') +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
- ggsave('ownership_change.png')
-
-# Create network of required coordination based
-# file file-by-file are the technical dependencies between software files
-# task4 show the technical dependencies for version 4
-# the id's in task 4 are unique per version
-# question: if a file wasn't modified it is not listed in developer-by-file, but in file-by-file
-# and the id in file-by-file is not the same than the file would have had in the previous version
-# if yes, How do I know the owner of that
-# 
-# goal: in task4 replace the file_id with the owner's name
-head(task4)
-#data frame that needs to be converted
-req_communication <- task4[,c(1:2)]
-# this is the lookup table, containing the ID
-# and the folder owner name
-
-ownership_withid <- DF[ ,c(7, 43)] 
-# 
-# It needs to be the complete dataset (DF) for when a file hasn't been modified in this
-# version. if the file hasn't been modified in ver4, it will not be shown in 
-# dev4_raw. This will result in NA for when matching needed and required 
-# communication
-req_communication[] <- ownership_withid$folder_owner[match(
-  unlist(req_communication), ownership_withid$ID_File_und)]
-req_communication$weight <- task4[,3]
-
-which(DF$ID_File_und == 36927, )
-
-# this is 0 because the file with the ID 135895 wasn't modified in ver4
-max(DF$ID_File_und, na.rm=T)
-
-head(req_communication)
-head(task4)
-
-
 # analysis v4 -------------------------------------------------------------
 
 # testing of non-mirroring hypothesis
@@ -1030,9 +666,12 @@ head(task4)
 # in the folder, but not the subfolders
 
 # create DV
-dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',', stringsAsFactors = F)
+#dev4_raw <- read.csv('data/developer-by-file/developer-by-file_1.5.csv', header=T, sep=',', stringsAsFactors = F)
+dev4_raw <- DF[DF$ver == 4,]
 str(dev4_raw)
 
+# dev4 network is a newtork based on the 2 mode network: author - and filename. 
+# Nodes are authors, and edges indicate if these two developers worked on the same file
 dev4 <- devnetwork(DF, 4) # add here type of node
 
 # modified and added network
@@ -1041,7 +680,15 @@ dev4-a <- devnetwork_version(dev4_a_raw) # error: invalid vertex names
 
 dev4_m_raw <- dev4_raw[dev4_raw$action == "M",]
 
-# finish later 
+
+
+
+
+
+
+
+
+
 # Task 3 ------------------------------------------------------------------
 # longitudinal
 
