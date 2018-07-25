@@ -24,6 +24,15 @@ library(statnet)
 # required communication between folder owners: named: reqcomm
 
 
+# some terms --------------------------------------------------------------
+
+# zero inflation = when you have a sparse matrix with most people not interacting, but when
+# two people are interacting the level of interaction is pretty high. control for this by
+# adding the term nonzero()
+
+# Edgecov
+
+
 # data --------------------------------------------------------------------
 
 microtask_file <- DF[DF$ver == 4, c(1,2)]
@@ -208,7 +217,7 @@ mt_own_sum <- unique(mt_own_sum)
 mtown_net <- network(mt_own_sum, directed=T, matrix.type='e', ignore.eval=F, names.eval='freq_own')
 # nodes = developer
 # edges = number of times developers worked on same file
-mtown_el <- as.edgelist(mtown_net, attrname = 'frequency')
+mtown_el <- as.edgelist(mtown_net, attrname = 'freq_own')
 
 add.edges(g_own, mtown_el[,1], mtown_el[,2], names.eval = 'freq_own', vals.eval = mtown_el[,3])
 g_own
@@ -236,11 +245,372 @@ gplot(reqc_net, diag=F, label = reqc_net %v%'vertex.names', edge.lwd=log(reqc_ne
 # 
 # independent variables = required communication based on file dependencies
 
-base <- ergm(mtfo_net ~ sum, response="frequency", reference=~Geometric)
+base <- ergm(g_mt ~ sum, response="freq_collab", reference=~Geometric)
 
 
 # valued ergo - model building --------------------------------------------
 
-m1 <- ergm(mtfo_net ~ sum 
-           + edgecov(downer, form='sum')
-           , response="frequency", reference=~Geometric)
+ggplot(as.data.frame(g_mt%e%'freq_collab'), aes(x =g_mt %e% "freq_collab")) + geom_bar() + 
+  labs(title="Distribution of Collaboration values", x = 'Frequency of Collaboration', y = 'Count')
+
+ggplot(as.data.frame(g_req %e% "req_comm"), aes(x =g_req %e% "req_comm")) + 
+  geom_bar() + 
+  labs(title="Distribution of required communication values", 
+       x = 'Frequency of Required Communication', 
+       y = 'Count')
+hist(g_req %e% "req_comm")
+
+m1 <- ergm(g_mt ~ sum + nonzero()
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m1)
+# no convergence
+
+m1 <- ergm(g_mt ~ sum 
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m1)
+summary(m1)
+# converged
+# Explanations: All phrased if the effect size is positive
+# the effects are expresssed as log odds. Take the exponential to get the odds
+# sum = the chance that two developers work on the same file
+# edgecov = 
+
+
+m2 <- ergm(g_mt ~ sum 
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           + nodematch('jobtitle')
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m2)
+summary(m2)
+# not converged. 
+
+# m3 with control variables  ------------------------------------------------------------
+
+ggplot(as.data.frame(g_own%e%'freq_own'), aes(x =g_own %e% "freq_own")) + geom_bar() + 
+  labs(title="Distribution of Ownership values", x = 'Frequency of Ownership', y = 'Count')
+
+
+m3 <- ergm(g_mt ~ sum 
+           # control variables (homophily)
+           + nodematch('jobtitle')
+           + nodematch('location')
+           + nodematch('contract')
+           # control variables (hierarchy)
+           #+ nodefactor('jobtitle') # I think this term causes non convergence. see m2
+           # control variables (network structures)
+           + nodesqrtcovar(center=T) # individual tendency to work
+           + transitiveweights("min","max","min") 
+           + cyclicalweights("min","max","min")
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m3)
+summary(m3)
+
+# convergence not reached. try with smaller model and build it up
+
+m3 <- ergm(g_mt ~ sum 
+           # control variables (homophily)
+           + nodematch('jobtitle')
+           #+ nodematch('location')
+           #+ nodematch('contract')
+           
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m3)
+summary(m3)
+
+# did not converge
+
+m3 <- ergm(g_mt ~ sum 
+           # control variables (homophily)
+           #+ nodematch('jobtitle')
+           + nodematch('location')
+           #+ nodematch('contract')
+           
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m3)
+summary(m3)
+
+# not convergences
+
+
+m3 <- ergm(g_mt ~ sum 
+           # control variables (homophily)
+           #+ nodematch('jobtitle')
+           #+ nodematch('location')
+           + nodematch('contract')
+           
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson)
+mcmc.diagnostics(m3)
+summary(m3)
+
+# not converged
+
+m3 <- ergm(g_mt ~ sum 
+           # control variables (homophily)
+           #+ nodematch('jobtitle')
+           #+ nodematch('location')
+           #+ nodematch('contract')
+           
+           # control variables (structural terms)
+           + nodesqrtcovar(center=T) # individual tendency to work
+           + transitiveweights("min","max","min") 
+           + cyclicalweights("min","max","min")
+           
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(MCMC.samplesize = 5000,
+                                    MCMC.interval = 2024,
+                                    MCMC.burnin = 50000,
+                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                    )
+)
+mcmc.diagnostics(m3)
+summary(m3)
+
+# did not converge
+# something to curb the nodesqrrtcovar effect. it is not only going up. 
+# it needs to be dampened
+
+mean_collab <- mean(g_mt%e%'freq_collab')
+sd_collab <- sd(g_mt%e%'freq_collab')
+mean_collab + sd_collab
+
+
+m3 <- ergm(g_mt ~ sum + nonzero()
+           # control variables (homophily)
+           #+ nodematch('jobtitle')
+           #+ nodematch('location')
+           #+ nodematch('contract')
+           
+           # control variables (structural terms)
+           + nodesqrtcovar(center=F) # individual tendency to work
+           + transitiveweights("min","max","min") 
+           #+ cyclicalweights("min","max","min")
+           + atleast(mean_collab + sd_collab)
+           #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+)
+
+
+# converged
+# 
+# Try 1: tested with  + atleast(mean_collab + sd_collab) + equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
+# and an increased mcmc sampling chain, but the chains didn't mix at all
+# Outcome: 
+# 1: cyclicalweights.min.max.min are at their smallest attainable values. Their coefficients will be fixed at -Inf.
+# 2: no convergence
+# Try 2: take out cyclicalweights
+mcmc.diagnostics(m3)
+# converged byt lots of NaN (zero standard deviation) for nonzero nodesqrtcovar, transweight
+# atleast, edgeoc req_comm
+# 
+# based on http://mailman13.u.washington.edu/pipermail/statnet_help/2017/002470.html
+# the zero could be because some of the relationships with the effects has 0.
+# This is not detected in valued ergm as a sum could be 0.
+# this could be because no one as values 1st above the mean --> 7 edge values
+# are 1 sd above mean
+# observation: effect for nonzero huge. rerun m3 but controlling for zero inflation. 
+# rerun as m4 to compare
+summary(m3)
+
+m4 <- ergm(g_mt ~ sum + nonzero()
+           # control variables (homophily)
+           #+ nodematch('jobtitle')
+           #+ nodematch('location')
+           #+ nodematch('contract')
+           
+           # control variables (structural terms)
+           + nodesqrtcovar(center=F) # individual tendency to work
+           + transitiveweights("min","max","min") 
+           #+ cyclicalweights("min","max","min")
+           + atleast(mean_collab + sd_collab)
+           #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+           ))
+# converged
+mcmc.diagnostics(m4)
+#  In cor(as.matrix(x)) : the standard deviation is zero
+#  observations for m4: bit better model (smaller bic/aic). also variation in edgecov(g_own)
+#  
+summary(m4)
+
+m5 <- ergm(g_mt ~ sum + nonzero()
+           # control variables (homophily)
+           + nodematch('jobtitle')
+           #+ nodematch('location')
+           #+ nodematch('contract')
+           
+           # control variables (structural terms)
+           + nodesqrtcovar(center=F) # individual tendency to work
+           + transitiveweights("min","max","min") 
+           #+ cyclicalweights("min","max","min")
+           + atleast(mean_collab + sd_collab)
+           #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(MCMC.samplesize = 5000,
+                                    MCMC.interval = 2024,
+                                    MCMC.burnin = 50000,
+                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                    
+           ))
+
+# model converged. 
+# on second run:  Approximate Hessian matrix is singular.
+mcmc.diagnostics(m5)
+
+m6 <- ergm(g_mt ~ sum + nonzero()
+           # control variables (homophily)
+           + nodematch('jobtitle')
+           #+ nodematch('location')
+           #+ nodematch('contract')
+           
+           # control variables (structural terms)
+           + nodesqrtcovar(center=F) # individual tendency to work
+           + transitiveweights("min","max","min") 
+           #+ cyclicalweights("min","max","min")
+           #+ atleast(mean_collab + sd_collab)
+           + equalto(mean(g_mt%e%'freq_collab', tolerance = sd_collab))
+           # hypothesis testing
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(
+                                    # MCMC.samplesize = 5000,
+                                    # MCMC.interval = 2024,
+                                    # MCMC.burnin = 50000,
+                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+           ))
+# Error in solve.default(H, tol = 1e-20) : Lapack routine dgesv: system is exactly singular: U[2,2] = 0
+# discard model 6
+
+m7 <- ergm(g_mt ~ sum + nonzero()
+           + nodematch('jobtitle')
+           + mutual(form = "min", threshold = mean(g_mt%e%'freq_collab'))
+           
+           
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(MCMC.samplesize = 5000,
+                                    MCMC.interval = 2024,
+                                    MCMC.burnin = 50000,
+                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                    
+           ))
+# no convergence after 20 iterations
+m8 <- ergm(g_mt ~ sum + nonzero()
+           + nodematch('jobtitle')
+           + mutual(form = "min", threshold = mean(g_mt%e%'freq_collab'))
+           
+           + transitiveweights("min","max","min") 
+           
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(MCMC.samplesize = 5000,
+                                    MCMC.interval = 2024,
+                                    MCMC.burnin = 50000,
+                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                    
+           ))
+
+# no convergence after 20 iterations
+# 
+# observations: adding mutual to the model leads to convergence problems (m7, m8)
+
+# model 4 to 8 don't yield good results. 
+
+m9 <- ergm(g_mt ~ sum + nonzero()
+           + nodematch('jobtitle')
+           
+           + transitiveweights("min","max","min") 
+           
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(#MCMC.samplesize = 5000,
+                                    #MCMC.burnin = 50000,
+                                    #MCMC.interval = 2024,
+                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                    
+           ))
+
+mcmc.diagnostics(m9)
+# low p-values in mcmc.diagnostics.
+# upward trend for transitive weights and edgecov _req_comm
+
+m9.1 <- ergm(g_mt ~ sum# + nonzero()
+           + nodematch('jobtitle')
+           
+           + transitiveweights("min","max","min") 
+           
+           + edgecov(g_own, attrname = 'freq_own', form='sum')
+           + edgecov(g_req, attrname = 'req_comm', form='sum')
+           
+           , response="freq_collab", reference=~Poisson
+           , control = control.ergm(#MCMC.samplesize = 5000,
+             #MCMC.burnin = 50000,
+             #MCMC.interval = 2024,
+             MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+             
+           ))
+# model 9.1 isn't too bad. Some wobblyness in the chains, but that might (!) be eliminated 
+# with opimizing the mcmc parameters
+summary(m9.1)
+
+# explanations
+exp(1.45)
+# developers have a likelihood of 4.26 to work on the same file
+exp(-0.212)
+# if developers have the same job title they are 0.808 less likely to work on the same file
+# developers who have the same job title have a likelihood of 3.45( 4.26 - 0.808) to work on the same file
+exp(-1.22) #transitive weights
+# developers who 
+exp(-.07)
+# developers who work on files owned by someone else, are 0.93 less likely to interact with the owner
+# 
+# Conway–Maxwell–Poisson ? Fractional moments to take into account over/underdispersion of counts
+# 
+
+
+
