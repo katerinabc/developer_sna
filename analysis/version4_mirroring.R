@@ -222,6 +222,61 @@ mtown_el <- as.edgelist(mtown_net, attrname = 'freq_own')
 add.edges(g_own, mtown_el[,1], mtown_el[,2], names.eval = 'freq_own', vals.eval = mtown_el[,3])
 g_own
 
+
+
+# create N2 ---------------------------------------------------------------
+
+# N2 is the network which combines interaction between domain ownership, and task 
+# interdependencies
+# developers own folders. each folder has a number of files. the folders a developer 
+# owns make up the domain s/he owns. 
+# 
+# N2 is composed of 3 matrices: Owernshi (MxN), task interdependencies (MxM), and the
+# transpose of the ownership matrix
+# 
+# The owersnhip matrix shows which developer owns what file
+# The task interdependences show what files (N) are technically linked to each other
+# the transpose of the ownershup matrix shows what files are owned by a person
+# 
+# step 1: multiply MxN matrix wiht a NxN matrix gets a MxN matric
+# step 2: multiply MxN matrix from step 1 with NxM matrix 
+
+domain_own <- DF[,c(45,7)]
+td <- task4
+
+# when multiplying the ownership matrix w/ the task interdependencies, the columns
+# (files) in the ownership matrix need to be in the same order than the files in the
+# task owernship file
+
+# let's see in the first 100 entries of ID_file_und in the domain_own file
+head(domain_own$ID_File_und, 100)
+
+# the function 'order' sorts the rows by the values in the ID_file_und column
+domain_own <- domain_own[order(domain_own$ID_File_und),]
+head(domain_own$ID_File_und, 100)
+
+# Let's check the td file to make sure we have the same order
+
+head(td, 10)
+
+# weighted edgelist to sociomatrix
+library(amen)
+td_sm <- el2sm(as.matrix(td)) # this works
+
+# lets check the order of the td_sm file and the domain_own file. 
+rownames(td_sm) # inspecting the names of the rows in td
+
+# checking the length of both files that need to be matched
+length(rownames(td_sm))
+length(domain_own$ID_File_und)
+
+# they are not the same length. one has 3189 rows, the other 11938 
+
+table(duplicated(domain_own$ID_File_und))
+# domain_own has 5801 duplicated. 
+# what to do with the files that do not match
+ 
+
 # descriptives ------------------------------------------------------------
 
 # Number of develoers in version 4
@@ -269,7 +324,6 @@ mcmc.diagnostics(m1)
 
 m1 <- ergm(g_mt ~ sum 
            + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
            , response="freq_collab", reference=~Poisson)
 mcmc.diagnostics(m1)
 summary(m1)
@@ -594,6 +648,7 @@ m9.1 <- ergm(g_mt ~ sum# + nonzero()
              MCMC.prop.weights='0inflated' # to control for skweded degree distribution
              
            ))
+mcmc.diagnostics(m9.1)
 # model 9.1 isn't too bad. Some wobblyness in the chains, but that might (!) be eliminated 
 # with opimizing the mcmc parameters
 summary(m9.1)
