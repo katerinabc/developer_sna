@@ -1,18 +1,34 @@
 # Define ownership network
-
+library(pathological)
 source('data_import.R', echo=T)
 
+# Create dataset 'own. This dataset contains the file when they were created (action = A) 
+# using the shorter filename (column 40), author (column 1). column 39 contains ID rev.
+# ID rev is needed to make sure that the files are sorted properly. 
+# 
+# the data frame own is a look up data frame to check who first created a folder. It does
+# not contain folder onwership transfer when members change.
 own <- DF[DF$action == 'A',c(1,39, 40)] # ME: Use filename column with short filenames
 dim(own)
-own <- own[order(own$ID_rev),]
-table(duplicated(own[,2]))
+own <- own[order(own$ID_rev),] # sort the files
+table(duplicated(own[,2])) # check for duplicate filenames
 own <- own[!duplicated(own[,2]),] # remove duplicates
-library(pathological)
+
 
 names(own)
-own <- own[,-2]
+own <- own[,-2] # remove the colum ID rev as not needed in the future
 
 get_folder_name <- function(x){
+  # function to decompose the file path and get the last folder. 
+  # Decompose path returns the directory name, the file name, and file extension.
+  # The dirname is what we want as it contains the complete file path without the extension.
+  # The fuction 'decompose_path' creates a data frame.
+  # Of this data frame we take the first column, the 'dirname'
+  # From the dirname we want the file path. decompose_path adds the local working directory
+  # to the path. That needs to be removed first. 
+  # The file path of the files in the DF are returned. 
+  # 
+  # An easier way might have been to gsub (replace) everthing that comes after the "."
   x <- pathological::decompose_path(x)
   x <- x[,1]
   x <- gsub('/Users/katerinadoyle/Documents/gitrepo/developer_sna/analysis/',
@@ -20,12 +36,18 @@ get_folder_name <- function(x){
   return(x)
 }
 
+# To the data frame own we are going to add the names of the folder. This is done by 
+# looping through each row in DF. lapply applies the function 'get_folder_name' to all
+# entries (rows) in own[,2]
 own$folder_names <- unlist(lapply(own[,2], get_folder_name)) # returns the foldername
 
 # TOD: check if it correctly identifies file names without a file. when someone creates a folder
 
 # remove duplicates from the folder_names file. The first instance is always kept
-# this will be the folder owner
+# this will be the folder owner.
+# 
+# 4/9 KBC: not sure why I needed to remove duplicates again. A reason could be that
+# certain files have the same name, but different extensions. 
 dim(own)
 head(own)
 own <- own[!duplicated(own[,3]),]
@@ -45,6 +67,14 @@ for (i in 1:nrow(DF)){
 DF$folder_names <- tmp2
 
 # Add folder_owner to the file DF
+# 
+# The following steps are applied: 
+# 1. Get the folder owner for a folder based on who first created the folder. 
+# 2. Check if folder owner member in this version. 
+# 2.a If yes, no changes 
+# 2.b If no get new folder owner. New folder owner is person who worked on the file 
+# in the current version
+
 
 folder_owner <- NULL
 for (i in 1:nrow(DF)){
@@ -84,6 +114,8 @@ length(members_vec)
 
 DF$members <- members_vec
 
+# visualize folder ownerships  
+
 ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() + 
   scale_fill_brewer(type="qual", guide=guide_legend(title="Version Number")) +
   coord_flip() + 
@@ -109,12 +141,14 @@ ggsave("developer_contribution_per_folder.png")
 ggplot(folder_contribution, aes(value)) + geom_bar() + facet_wrap(~author)
 ggsave("facet_wrap_developer_contribution_per_folder.png")
 
+
 # create ownership of folders per version.
 # ownership can not be re-gained
 # workflow: 
 # 1. take subset of folders with modification in version x
 #own <- DF[,c(1, 3, 6, 39,40,42,43)]
-DF$folder_owner <- as.character(DF$folder_owner)
+DF$folder_owner <- as.character(DF$folder_owner) # make sure folder owners are in 
+# character typs and not categories
 
 authatt$author <- as.character(authatt$author)
 
