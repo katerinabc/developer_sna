@@ -108,14 +108,12 @@ for (i in 1:nrow(DF)){
   members_vec <- c(members_vec, tmp_member)
 }
 
-length(members_vec)
-
 DF$members <- members_vec
 
 # visualize folder ownerships  
 
 ggplot(DF, aes(x = folder_owner, fill = as.factor(ver))) + geom_bar() + 
-  scale_fill_brewer(type="qual", guide=guide_legend(title="Version Number")) +
+  scale_fill_discrete(guide=guide_legend(title="Version Number")) +
   coord_flip() + 
   labs("Ownership distribution by software version", 
        x = 'Frequency', y = 'Developer')
@@ -136,15 +134,17 @@ ggplot(folder_contribution, aes(x = author, y = folder_names)) +
   theme(axis.text.x = element_text(angle=45, hjust = 1))
 ggsave("developer_contribution_per_folder.png")
 
-ggplot(folder_contribution, aes(value)) + geom_bar() + facet_wrap(~author)
+ggplot(folder_contribution, aes(value)) + geom_bar() + facet_wrap(~author) + 
+  labs("Authors contribution to folders",
+       x= 'Level of Contribution per folder',
+       y = 'Count of contribution levels')
 ggsave("facet_wrap_developer_contribution_per_folder.png")
 
 
 # create ownership of folders per version.
-# ownership can not be re-gained
-# workflow: 
-# 1. take subset of folders with modification in version x
-#own <- DF[,c(1, 3, 6, 39,40,42,43)]
+# Ownership is based on contribution to folders
+# ownership can not be re-gained by re-joining the team.
+
 ## make sure folder owners are in character typs and not categories
 DF$folder_owner <- as.character(DF$folder_owner) 
 authatt$author <- as.character(authatt$author)
@@ -168,17 +168,17 @@ idx_nonmembers <- which(DF$members == FALSE)
 
 # copy the folder owner names. These will be overwrittenusing the loop if necessary 
 DF$new_owner <- DF$folder_owner
-# 
+ 
 # Assigning new folder owners.
-# A loop is creating going through the sequence of numbers in the index idx_nonmembers
+# A loop is created going through the sequence of numbers in the index idx_nonmembers
 # For every i, get the version number (column 6), folder name (column 42)
 # Subset 1: Get all developers who contributed to tmp_folder using the lookup table
 # contr_now
 # Subset 2: Subset the data file tmp_contributors to only get the developers who 
 # contributed to tmp_version Of this list of developers, pick the first one with the 
 # highest amount of contributions. Assign this name to 'new owner' (column 45 in DF)
-#sink("new_owner_test.txt") #sink writes the output to a text file for inspection
-# used to test the loop. 
+# sink("new_owner_test.txt") #sink writes the output to a text file for inspection
+# used to test the loop. Commented out once code is working
 
 for (i in idx_nonmembers){
   tmp_version <-DF[i,6]
@@ -194,18 +194,19 @@ for (i in idx_nonmembers){
 }
 #sink()
 
-View(DF[DF$members == FALSE, c(43:45)])
+View(DF[DF$members == FALSE, c(43:45)]) # visual inspection of folder owner changes
 
 table(DF[DF$members == FALSE, 43] == DF[DF$members == FALSE, 45])
-# 2x the new owner is the same as the old owner, and not in the version. 
-# inspect
+# none true. 
 
-View(DF[(DF$members == FALSE) & (DF$folder_owner == DF$new_owner),c(1,3, 6:7, 43:45)])
-# paride.ciatto is in version 6 - 13 --> he must be in version 5. he is listd there several times
-# longbow.liu is in versino 7 - 13
-
-View(DF[DF$author == "paride.ciatto", c(1,3, 6:7)])
-View(DF[DF$author == "longbow.liu", c(1,3, 6:7)])
+ 
+# block of code to find out errors in ownership change. error was due to coding of versions in DF
+# View(DF[(DF$members == FALSE) & (DF$folder_owner == DF$new_owner),c(1,3, 6:7, 43:45)])
+# # paride.ciatto is in version 6 - 13 --> he must be in version 5. he is listd there several times
+# # longbow.liu is in versino 7 - 13
+# 
+# View(DF[DF$author == "paride.ciatto", c(1,3, 6:7)])
+# View(DF[DF$author == "longbow.liu", c(1,3, 6:7)])
 
 
 ownership_change <- reshape2::melt(table(DF$folder_owner, DF$new_owner))
@@ -218,51 +219,106 @@ ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() 
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ggsave('ownership_change.png')
 
-# Create network of required coordination
+
+
+# Create network of required coordination ---------------------------------
+
+
 # file-by-file are the technical dependencies between software files. THese are stored in
 # DF2 for the complete software (all versions)
-# task4 show the technical dependencies for version 4
+# task_v2 show the technical dependencies for version 4
 # the id's in task 4 correspond to the IDs in 'ID_File_und' in DF and IDs in data set
 # 'files_xx'
 # earlier information: IDs are unique per version. 
-# goal: in task4 replace the file_id with the owner's name
 
-task4 <- DF2[DF2$file == "1.5.csv",]
-
-head(task4)
-# subset task4 to the technical dependencies
-reqcommv4 <- task4[,c(1:2)]
+# goal: in task_v2 replace the file_id with the owner's name
+# workflow: 
+task_v2 <- DF2[DF2$file == "1.5",] #file 1.5 is version 2 according to the new version coding 
+# schema - Mahdi 7/9/18
 
 # this is the lookup table, containing the ID (col 7) and the folder owner name (col 45)
-ownership_withid <- DF[DF$ver == 4 , c(7, 45)] 
+ownership_withid <- DF[, c(7, 45)] 
+ownership_withid <- ownership_withid[order(ownership_withid$ID_File_und),]
 
+# delete this comment?
 # It needs to be the complete dataset (DF) for when a file hasn't been modified in this
 # version. if the file hasn't been modified in ver4, it will not be shown in 
 # dev4_raw. This will result in NA for when matching needed and required 
 # communication
  
-
-# match the IDs in reqcomm4 with the IDs in the lookup table ownership_withid. 
+# match the IDs in reqcomm_v2 with the IDs in the lookup table ownership_withid. 
 # match returns a numerical vector. The number indicates the position (row number)
 # when the first match happened. In other words it checks in which row an ID mentioned 
-# in reqcommv4 appears in ownership_withid$ID_FILE_und. This row number is used to 
+# in reqcomm_v2 appears in ownership_withid$ID_FILE_und. This row number is used to 
 # assign the correct owner from the vector ownership_withinid$new_owner
-reqcommv4[] <- ownership_withid$new_owner[match(
-  unlist(reqcommv4), ownership_withid$ID_File_und)]
+ 
+# doesn't work as expected
+# library(data.table)
+# DT1 <- as.data.table(DF2[DF2$file == "1.5",1]) # sender
+# DT2 <- as.data.table(ownership_withid)
+# 
+# setkey(DT1, V1)
+# setkey(DT2, ID_File_und)
+# sender <- DT1[DT2]
+# 
+# DT1 <- as.data.table(DF2[DF2$file == "1.5",2]) # receiver
+# setkey(DT1, V1)
+# receiver <- DT1[DT2]
+# 
+# sender <- DF2[DF2$file == "1.5",c(1:2)] %>% left_join(ownership_withid, by = c('und_from_file_id'= 'ID_File_und'))
+# receiver <- DF2[DF2$file == "1.5",c(1:2)] %>% left_join(ownership_withid, by = c('und_to_file_id'= 'ID_File_und'))
+# 
 
-reqcommv4$weight <- task4[,3] # add the weights of the technical dependencies
+# #STOPPED HERE WITH REVIEWNG CODE. 
+# reqcomm_v2 <- task_v2[,c(1:2)] # subset task4 to the technical dependencies
+# reqcomm_v2[] <- ownership_withid$new_owner[match(
+#   unlist(reqcomm_v2), ownership_withid$ID_File_und)]
+# 
+# reqcomm_v2$weight <- task_v2[,3] # add the weights of the technical dependencies
+# 
+# # check how many files were not matched. 
+# table(is.na(reqcomm_v2))
 
-# check how many files were not matched. 
-table(is.na(reqcommv4))
+# This might be a bit weird, but I'm going to do mini steps to make sure it workds. 
+# Get a vector of sender and receivers. this vector contains the file ID
+sender_id <- task_v2[,1]
+receiver_id <- task_v2[,2]
 
-head(DF[DF$ver == 4, c(7,45)])
-DF[DF$ID_File_und == 8721, c(6, 7,45)]
-DF[DF$ID_File_und == 36927, c(6, 7,45)]
-DF[DF$ID_File_und == 58806, c(6, 7,45)]
-DF[DF$ID_File_und == 122539, c(6, 7,45)]
+# replace the file id with the folder owner names.
+sender_name <- ownership_withid$new_owner[match(sender_id, ownership_withid$ID_File_und)]
+receiver_name <- ownership_withid$new_owner[match(receiver_id, ownership_withid$ID_File_und)]
+
+# 29025 ids are not matched. Replace NA's with the id number
+
+# the files which don't have a folder owner name (no match) are NA for the moment. Replace NA with the
+# original file ID number.
+snd_na_idx <- which(is.na(sender_name))
+sender_name[snd_na_idx] <- sender_id[snd_na_idx]
+
+rcv_na_idx <- which(is.na(receiver_name))
+receiver_name[rcv_na_idx] <- receiver_id[rcv_na_idx]
+
+# create the micro task communication edgelist
+reqcomm_v2 <- cbind(sender_name, receiver_name, task_v2$weight)
+# View(reqcomm_v2)
+
+# count number of file IDs that have no owner
+length(snd_na_idx) + length(rcv_na_idx) # 27678
+
+# files with no assigned folder owner
+no_folder_owner <- as.data.frame(c(sender_id[snd_na_idx], receiver_id[rcv_na_idx]))
+length(unique(no_folder_owner$x)) # 2657 files --> need artificial name as this will be a big network
+
+
+# Ideal workflow: find out number of files with no owner. decide if keep file ID as artifical
+# folder owner name or replace with artifical name. 
+no_folder_owner %>% count()
+ggplot(as.data.frame(no_folder_owner), aes(x = no_folder_owner)) + geom_bar()
+
+
 
 # OLD EXPLANATION. STILL VALID ??
-# the files in reqcommv4 who have NA have not been modified in version 4. as the Id's are 
+# the files in reqcomm_v2 who have NA have not been modified in version 4. as the Id's are 
 # unique per version it is not possible to indicate to what folder this file belongs.
 # therefore it is not possible to assign ownership. 
 # a fictious developer ('notmodified') is assigned to these files
@@ -272,11 +328,11 @@ DF[DF$ID_File_und == 122539, c(6, 7,45)]
 # ver 4, but might have been in a previous version. check the previous version etc
 # remember the splitting of software !!!
 
-idx <- which(is.na(reqcommv4$und_from_file_id))
-reqcommv4[idx,1] <- 'not.modified'
+idx <- which(is.na(reqcomm_v2$und_from_file_id))
+reqcomm_v2[idx,1] <- 'not.modified'
 
-idx <- which(is.na(reqcommv4$und_to_file_id))
-reqcommv4[idx,2] <- 'not.modified'
+idx <- which(is.na(reqcomm_v2$und_to_file_id))
+reqcomm_v2[idx,2] <- 'not.modified'
 
 
 # remove all temporrary files
