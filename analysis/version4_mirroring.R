@@ -1,10 +1,10 @@
-# task 4 analysis
+# Analyzing interaction in version 2 (previously coded as version 1.5)
 
 # clean your workspace first 
 rm(list=ls())
 
 # By runnin the next line of code, all the required data objects
-# are created.
+# are created. This is not necessary if you have a saved RData file (see line 11)
 #source('ownership_developer_sna.R', echo=T)
 
 # Load the cleaned and prepared data
@@ -35,27 +35,37 @@ library(statnet)
 
 # data --------------------------------------------------------------------
 
-microtask_file <- DF[DF$ver == 4, c(1,2)]
-microtask_folder <- DF[DF$ver == 4, c(1,42)]
-microtask_owner <- DF[DF$ver == 4, c(1, 45)]
-fowner <- DF[DF$ver == 4, c(2, 45)]
-downer <- DF[DF$ver == 4, c(42,45)]
-taskdep <- task4
-reqcomm <- reqcommv4 # error in this file. only weights are attached
+microtask_file <- DF[DF$ver == 4, c(1,2)] # edgelist: author - file
+microtask_folder <- DF[DF$ver == 4, c(1,42)] # edgelist: autor - folder
+microtask_owner <- DF[DF$ver == 4, c(1, 45)] # edgelist: author - folder owner (FO)
+fowner <- DF[DF$ver == 4, c(2, 45)] # edgelist: file - folder owner (FO)
+downer <- DF[DF$ver == 4, c(42,45)] # edgelist: folder - folder owner (FO)
+taskdep <- task_v2 # dataset: file id (sender), file id (receiver), weight dependency, software version (old), software version (new)
+reqcomm <- reqcomm_v2 # edgelist: FO sender file, FO receiver file, weight dependency
 
-# create one set of nodes with names of working in v4 or not
+# create one set of nodes with names of working in v2 or not
 authatt$author<-as.character(authatt$author)
-authatt<- rbind(authatt, c(4, "not.modified", 22, 99, 99, 99))
-authors_v4 <- authatt[,c(2,1)]
-authors_v4$v4 <- authatt$ver == 4
+authatt<- rbind(authatt, c(4, "external_owner", 22, 99, 99, 99)) # add a row of entries for artificial developer
+authors_v2 <- authatt[,c(2,1)]
+authors_v2$v2 <- authatt$ver2 == 2 # add logical vector for membership
 
 # create networks ---------------------------------------------------------
+
+# The basis for most of the networks is a bipartite edgelist. This edgelist is sometimes weighted. 
+# To transfrom the bipartite edgelist into a one mode network with only developers, the following 
+# steps are done:
+# bipartite_to_row_projection is a function (see file functions_developer_sna) that creates a 
+# matrix based on the egelist. This function only works for non-weighted edgelist (frequency
+# edgelist). The output of this function is transformed into a matrix.
+# The matrix is transformed into a network with as.network.
+# Network description are added as needed.
 
 # microtask_file is a 2 mode network (developer - file). Project this to a dev-dev network
 head(microtask_file)
 mt_file <- as.matrix(bipart_to_row_projection(microtask_file$author, microtask_file$Filename)[[2]])
 # nodes = developer
 # edges = number of times developers worked on same file
+
 mtfi_net <- as.network(mt_file, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
 mtfi_net %v% 'vertex.names'
 
@@ -66,14 +76,15 @@ mt_folder <- as.matrix(bipart_to_row_projection(microtask_folder$author, microta
 # nodes = developer
 # edges = number of times  developers worked on files located in the same folder
 mtfo_net <- as.network(mt_folder, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
+gplot(mtfo_net, label=mtfo_net%v%'vertex.names') # fig not for publication
 
 head(microtask_owner)
 mt_owner <- network(microtask_owner, directed=T, matrix.type='e')
 # nodes = developers
 # edges = number of times developers worked on a file owned by someone else
-gplot(mt_owner, label=mt_owner%v%'vertex.names')
+gplot(mt_owner, label=mt_owner%v%'vertex.names') # this draws the network. Figure is not for publication
 
-# downer is a 2 mode network (developer - folder). Project this to a dev-dev network
+# downer is a 2 mode network (developer - folder). 
 head(downer)
 down <- bipart_to_row_projection(downer$new_owner, downer$folder_names)[[2]]
 # Great check. Only self-loops
@@ -82,16 +93,28 @@ down <- bipart_to_row_projection(downer$new_owner, downer$folder_names)[[2]]
 
 # make reqcomm into a network. it is already a 1 mode network (dev-dev)
 reqc_net <- network(reqcomm, directed=T, matrix.type='e', ignore.eval=F, names.eval='weights')
+reqc_net
+reqc_net %v%'vertex.names'
 # take 'not.modified' node out
-delete.vertices(reqc_net, which(reqc_net%v%'vertex.names' == 'not.modified'))
+#delete.vertices(reqc_net, which(reqc_net%v%'vertex.names' == 'not.modified'))
+gplot(reqc_net, label=reqc_net%v%'vertex.names') # fig not for publication
 
-# find developers who should be communicating, but are not in mtfo_net
-matches <- as.vector(reqc_net%v%'vertex.names' == mtfo_net%v%'vertex.names')
+
+# find developers who should be communicating, but are not in mtfo_net.
+# Add these to the network
+# 
+# STOPPED HERE. ERROR WITH CODE. HOW TO GET THEM IN PROPERLY
+matches <- as.vector( (reqc_net%v%'vertex.names') %in% (mtfo_net%v%'vertex.names'))
 required_developers <- unlist((reqc_net%v%'vertex.names'))
+
+
 missing_developers <- required_developers[!matches]
-add.vertices(reqc_net, nv = 3, vertex.names = missing_developers)
-reqc_net %v% 'vertex.names'
-reqc_net %v% 'not_in_mfo_net' <- 
+add.vertices(reqc_net, nv = length(missing_developers))
+from <- length(network.vertex.names(reqc_net)) - (length(missing_developers)-1)
+to <- length(network.vertex.names(reqc_net))
+network.vertex.names(reqc_net)[from:to] <-missing_developers
+network.vertex.names(reqc_net)
+reqc_net %v% 'not_in_mfo_net' <- matches
 
 # create empty network g ----------------------------------------------
 

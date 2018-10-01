@@ -280,6 +280,9 @@ DF[DF$ID_File_und == 36927, c(1:4, 41, 45)]
 reqcomm_v2[snd_na_idx,1] <- 'external_owner'
 reqcomm_v2[rcv_na_idx,2] <- 'external_owner'
 
+reqcomm_v2 <- as.data.frame(reqcomm_v2) # transform dataset from matrix into data frame
+names(reqcomm_v2)[3] <- 'weights' # assign weights to ownership dependencies
+
 # remove all temporrary files
 rm(list=ls()[grep('tmp', ls())])
 
