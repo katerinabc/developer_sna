@@ -102,57 +102,81 @@ gplot(reqc_net, label=reqc_net%v%'vertex.names') # fig not for publication
 
 # find developers who should be communicating, but are not in mtfo_net.
 # Add these to the network
-# 
-# STOPPED HERE. ERROR WITH CODE. HOW TO GET THEM IN PROPERLY
 matches <- as.vector( (reqc_net%v%'vertex.names') %in% (mtfo_net%v%'vertex.names'))
-required_developers <- unlist((reqc_net%v%'vertex.names'))
-
-
+required_developers <-(reqc_net%v%'vertex.names')
 missing_developers <- required_developers[!matches]
-add.vertices(reqc_net, nv = length(missing_developers))
-from <- length(network.vertex.names(reqc_net)) - (length(missing_developers)-1)
-to <- length(network.vertex.names(reqc_net))
-network.vertex.names(reqc_net)[from:to] <-missing_developers
-network.vertex.names(reqc_net)
+add.vertices(mtfo_net, nv = length(missing_developers))
+from <- (length(network.vertex.names(mtfo_net)) - (length(missing_developers))) +1
+to <- length(network.vertex.names(mtfo_net))
+network.vertex.names(mtfo_net)[from:to] <- missing_developers
+network.vertex.names(mtfo_net)
 reqc_net %v% 'not_in_mfo_net' <- matches
 
 # create empty network g ----------------------------------------------
 
-# change format of authoratt from a long into a wide format
+# change format of authoratt from a long into a wide format. In this way, every developer
+# is mentioned once (one row per developer) with a new columns indicating if they are member 
+# in a version
 
 library(tidyr)
-authattw <- spread(authatt, ver, author)
+authattw <- spread(unique(authatt[,-1]), value = author, key = ver2)
 
+nbr_dev <- length(unique(authatt$author)) # set the size of the network to the
+# number of developers
+ 
 #Initialize a network object
-g<-network.initialize(22)
+g<-network.initialize(nbr_dev)
 
-# add vertex attributes
-set.vertex.attribute(g, 'vertex.names', c(unique(as.character(authatt$ID_author)), '22'))
-set.vertex.attribute(g, 'developers', c(unique(as.character(authatt$author)), 'not.modified'))
+unique(authatt$author) # check if artifical developer already part of list. 
+# If not, run the next two lines that are commented out.
+# set.vertex.attribute(g, 'vertex.names', c(unique(as.character(authatt$ID_author)), '22'))
+# set.vertex.attribute(g, 'developers', c(unique(as.character(authatt$author)), 'external_owner'))
+
+# add vertex attributes. Run the following two lines only if the external developer is included
+# in the file authatt. If not, run the two lines above that are commented out. 
+set.vertex.attribute(g, 'vertex.names', unique(as.character(authatt$ID_author)))
+set.vertex.attribute(g, 'developers', unique(as.character(authatt$author)))
+
 participants <- NULL
 jobtitle <- NULL
 location <- NULL
 contract <- NULL
-authors_v4 <- authatt[authatt$ver == 4,]
+authors_v2 <- authatt[authatt$ver2 == 2,]
+
+# in the following loop information for developers who are members of version 2 is stored in a 
+# number of temporary files (all begnning with tmp_).
+# If a developer is not member of the version the number 99 is added. 
 for (i in get.vertex.attribute(g, 'developers')){
-  tmp_ver <- authatt[authatt$author == i, 1]
-  if(4 %in% tmp_ver){present <- 1}else{present<-0}
+  print(i)
+  tmp_ver <- authatt[authatt$author == i, 7]
+  if(2 %in% tmp_ver){present <- 1}else{present<-0}
   participants <- cbind(participants, present)
   
-  if(4 %in% tmp_ver){tmp_job <- authors_v4[authors_v4$author == i, 4]}else{tmp_job<- 99}
+  if(2 %in% tmp_ver){tmp_job <- authors_v2[authors_v2$author == i, 4]}else{tmp_job<- 99}
   jobtitle <- cbind(jobtitle, tmp_job)
   
-  if(4 %in% tmp_ver){tmp_loc <- authors_v4[authors_v4$author == i, 5]}else{tmp_loc<- 99}
+  if(2 %in% tmp_ver){tmp_loc <- authors_v2[authors_v2$author == i, 5]}else{tmp_loc<- 99}
   location <- cbind(location, tmp_loc)
   
-  if(4 %in% tmp_ver){tmp_con <- authors_v4[authors_v4$author == i, 6]}else{tmp_con<- 99}
+  if(2 %in% tmp_ver){tmp_con <- authors_v2[authors_v2$author == i, 6]}else{tmp_con<- 99}
   contract <- cbind(contract, tmp_con)
   
 }
-set.vertex.attribute(g, 'ver4', t(participants)[,1])
+set.vertex.attribute(g, 'ver2', t(participants)[,1])
 set.vertex.attribute(g, 'jobtitle', t(jobtitle)[,1])
 set.vertex.attribute(g, 'location', t(location)[,1])
 set.vertex.attribute(g, 'contract', t(contract)[,1])
+
+# After running these lines of code you get an empty network g. It is empty because no edges
+# are included. You can check this by typing g (the name of the empty network) in the console.
+# The network g only includes the vertices (the 21 real developers and the 1 artificial one) 
+# and their attributes. If you like to see the attributes (demographics) about the developers
+# comment out the following line.
+
+g %v% 'location' 
+# to see other attributes use this command: network_name %v% attribute_name
+# the 'v' between percent signs stands for vertex. Use e for edges. The attribute name needs 
+# to be given as character. 
 
 
 # copy the empty network and add required communication (technical --------
