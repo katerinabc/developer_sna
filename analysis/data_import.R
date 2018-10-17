@@ -25,7 +25,7 @@ for (f in myFiles) {
 
 # correct the version numbers
 version_transformation <- cbind(ori = as.character(c('1.4', '1.4build1', '1.4build3', '1.5', '1.5.2', '1.5.3', "1.5.4", "1.5.5", "2.0.0" , "2.0.1", "2.0.2", "2.0.3", "2.1.0")),
-                                      new = as.character(c(1,   1,     1,     2,    3,       4, 5     , 6,     7,     8,     9,    10 , 11)))
+                                      new = as.character(c(1,   1,               1,     2,    3,       4, 5     , 6,     7,     8,     9,    10 , 11)))
 
 DF$ver <- version_transformation[,2][match(DF$file, version_transformation[,1])]
 

@@ -34,6 +34,7 @@ devnetwork_version <- function(dataset){
 # 2mode edgelist into matrix ----------------------------------------------
 
 bipart_to_row_projection <- function(df_name_mode1, df_name_mode2){
+  # code from https://solomonmessing.wordpress.com/2012/09/30/working-with-bipartiteaffiliation-network-data-in-r/
 require('Matrix')
 A <- spMatrix(nrow=length(unique(df_name_mode1)),
               ncol=length(unique(df_name_mode2)),
@@ -47,7 +48,24 @@ colnames(A) <- levels(factor(df_name_mode2))
 Arow <- tcrossprod(A)
 return(list(A, Arow))
 
+}
 
+
+bipart_to_col_projection <- function(df_name_mode1, df_name_mode2){
+  # code from https://solomonmessing.wordpress.com/2012/09/30/working-with-bipartiteaffiliation-network-data-in-r/
+  require('Matrix')
+  A <- spMatrix(nrow=length(unique(df_name_mode1)),
+                ncol=length(unique(df_name_mode2)),
+                i = as.numeric(factor(df_name_mode1)),
+                j = as.numeric(factor(df_name_mode2)),
+                x = rep(1, length(as.numeric(df_name_mode1))) 
+  )
+  row.names(A) <- levels(factor(df_name_mode1))
+  colnames(A) <- levels(factor(df_name_mode2))
+  
+  Acol <- tcrossprod(t(A))
+  return(list(A, Acol))
+  
 }
 
 

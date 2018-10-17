@@ -44,10 +44,20 @@ taskdep <- task_v2 # dataset: file id (sender), file id (receiver), weight depen
 reqcomm <- reqcomm_v2 # edgelist: FO sender file, FO receiver file, weight dependency
 
 # create one set of nodes with names of working in v2 or not
+
+# complete developer information dataset
 authatt$author<-as.character(authatt$author)
 authatt<- rbind(authatt, c(4, "external_owner", 22, 99, 99, 99)) # add a row of entries for artificial developer
 authors_v2 <- authatt[,c(2,1)]
 authors_v2$v2 <- authatt$ver2 == 2 # add logical vector for membership
+authatt$v2 <- authatt$ver2 == 2
+
+# all developers, but only unique information (not version memebrship information)
+authors_unique <- authatt[!duplicated(authatt$author),]
+
+# authors working in version 2 only
+authors_mbr_v2 <- authatt[authatt$ver2 == 2,]  
+
 
 # create networks ---------------------------------------------------------
 
@@ -92,12 +102,20 @@ down <- bipart_to_row_projection(downer$new_owner, downer$folder_names)[[2]]
 # edges = number of times 2 developers own the same folder.  
 
 # make reqcomm into a network. it is already a 1 mode network (dev-dev)
-reqc_net <- network(reqcomm, directed=T, matrix.type='e', ignore.eval=F, names.eval='weights')
+reqcomm <- as.data.frame(reqcomm)
+reqcomm$V3 <- as.numeric(as.character(reqcomm$V3))
+
+# summarize reqcomm per unique node-node pair.
+library(dplyr)
+reqcomm_grp <- reqcomm %>% group_by(sender_name, receiver_name) %>% summarize(weights = sum(V3))
+ 
+reqc_net <- network(reqcomm_grp, directed=T, matrix.type='e', ignore.eval=F, names.eval='weights')
 reqc_net
 reqc_net %v%'vertex.names'
+head(reqc_net %e%'weights')
 # take 'not.modified' node out
 #delete.vertices(reqc_net, which(reqc_net%v%'vertex.names' == 'not.modified'))
-gplot(reqc_net, label=reqc_net%v%'vertex.names') # fig not for publication
+gplot(reqc_net, label=reqc_net%v%'vertex.names', edge.lwd = log(as.vector(reqc_net%e%'weights'))) # fig not for publication
 
 
 # find developers who should be communicating, but are not in mtfo_net.
@@ -141,7 +159,6 @@ participants <- NULL
 jobtitle <- NULL
 location <- NULL
 contract <- NULL
-authors_v2 <- authatt[authatt$ver2 == 2,]
 
 # in the following loop information for developers who are members of version 2 is stored in a 
 # number of temporary files (all begnning with tmp_).
@@ -152,20 +169,20 @@ for (i in get.vertex.attribute(g, 'developers')){
   if(2 %in% tmp_ver){present <- 1}else{present<-0}
   participants <- cbind(participants, present)
   
-  if(2 %in% tmp_ver){tmp_job <- authors_v2[authors_v2$author == i, 4]}else{tmp_job<- 99}
+  if(2 %in% tmp_ver){tmp_job <- authors_mbr_v2[authors_mbr_v2$author == i, 4]}else{tmp_job<- 99}
   jobtitle <- cbind(jobtitle, tmp_job)
   
-  if(2 %in% tmp_ver){tmp_loc <- authors_v2[authors_v2$author == i, 5]}else{tmp_loc<- 99}
+  if(2 %in% tmp_ver){tmp_loc <- authors_mbr_v2[authors_mbr_v2$author == i, 5]}else{tmp_loc<- 99}
   location <- cbind(location, tmp_loc)
   
-  if(2 %in% tmp_ver){tmp_con <- authors_v2[authors_v2$author == i, 6]}else{tmp_con<- 99}
+  if(2 %in% tmp_ver){tmp_con <- authors_mbr_v2[authors_mbr_v2$author == i, 6]}else{tmp_con<- 99}
   contract <- cbind(contract, tmp_con)
   
 }
-set.vertex.attribute(g, 'ver2', t(participants)[,1])
-set.vertex.attribute(g, 'jobtitle', t(jobtitle)[,1])
-set.vertex.attribute(g, 'location', t(location)[,1])
-set.vertex.attribute(g, 'contract', t(contract)[,1])
+set.vertex.attribute(g, 'ver2', as.numeric(t(participants)[,1]))
+set.vertex.attribute(g, 'jobtitle', as.numeric(t(jobtitle)[,1]))
+set.vertex.attribute(g, 'location', as.numeric(t(location)[,1]))
+set.vertex.attribute(g, 'contract', as.numeric(t(contract)[,1]))
 
 # After running these lines of code you get an empty network g. It is empty because no edges
 # are included. You can check this by typing g (the name of the empty network) in the console.
@@ -182,30 +199,42 @@ g %v% 'location'
 # copy the empty network and add required communication (technical --------
 
 g_req <- g
+
 # add edge values for required communication
 # step 1: modifiy reqcomm names so that instead of the names it shows the ID numbers
 # the network packages requirs vertex ids to be sequential numbers starting with 1
-reqcomm2 <- reqcomm
+reqcomm2 <- reqcomm_grp
+
+# the values in reqcomm2 need to be turned into character vectors and not factors. 
+str(reqcomm2)
+reqcomm2$sender_name <- as.character(reqcomm2$sender_name)
+reqcomm2$receiver_name <- as.character(reqcomm2$receiver_name)
 
 # modify tail/sender
-for (i in 1:length(reqcomm2$und_from_file_id)){ # could be coded easier
-  tmp_dev <- reqcomm2$und_from_file_id[i]
-  tmp_id <- authors_v4[authors_v4$author == tmp_dev, 3]
-  reqcomm2$und_from_file_id[i] <- tmp_id
+reqcomm2_snd <- NULL
+for (i in 1:length(reqcomm2$sender_name)){ # could be coded easier
+  tmp_dev <- reqcomm2$sender_name[i]
+  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+  print(paste("step:", i, "and developer id: ", tmp_id))
+  #reqcomm2$sender_name[i] <- tmp_id
+  reqcomm2_snd <- c(reqcomm2_snd, tmp_id)
 }
 
 # modify head/receiver
-for (i in 1:length(reqcomm2$und_to_file_id)){ # could be coded easier
-  tmp_dev <- reqcomm2$und_to_file_id[i]
-  tmp_id <- authors_v4[authors_v4$author == tmp_dev, 3]
-  reqcomm2$und_to_file_id[i] <- tmp_id
+reqcomm2_rcv <- NULL
+for (i in 1:length(reqcomm2$receiver_name)){ # could be coded easier
+  tmp_dev <- reqcomm2$receiver_name[i]
+  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+  #reqcomm2$receiver_name[i] <- tmp_id
+  reqcomm2_rcv <- c(reqcomm2_rcv, tmp_id)
 }
 
 # aggregate reqcomm so that for each edge and self-loop only 1 row
-reqcomm2_sum<-aggregate(reqcomm2$weight, by=list(reqcomm2$und_from_file_id, reqcomm2$und_to_file_id), sum)
+#reqcomm2_sum<-aggregate(reqcomm2$weight, by=list(reqcomm2$und_from_file_id, reqcomm2$und_to_file_id), sum)
 
 # add edges
-add.edges(g_req, tail = reqcomm2_sum$Group.1, head = reqcomm2_sum$Group.2, names.eval = 'req_comm', vals.eval = reqcomm2_sum$x)
+add.edges(g_req, tail = reqcomm2_snd, head = reqcomm2_rcv, 
+          names.eval = 'req_comm', vals.eval = reqcomm2$weights)
 g_req
 
 
@@ -219,7 +248,7 @@ head(microtask_file)
 # replace developer name with vertex id
 for (i in 1:length(microtask_file$author)){ # could be coded easier
   tmp_dev <- microtask_file$author[i]
-  tmp_id <- authors_v4[authors_v4$author == tmp_dev, 3]
+  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
   microtask_file$author[i] <- tmp_id
 }
 
@@ -244,14 +273,14 @@ head(microtask_owner)
 # replace developer[author] name with vertex id
 for (i in 1:length(microtask_owner$author)){ # could be coded easier
   tmp_dev <- microtask_owner$author[i]
-  tmp_id <- authors_v4[authors_v4$author == tmp_dev, 3]
+  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
   microtask_owner$author[i] <- tmp_id
 }
 
 # replace developer[new_owner] name with vertex id
 for (i in 1:length(microtask_owner$new_owner)){ # could be coded easier
   tmp_dev <- microtask_owner$new_owner[i]
-  tmp_id <- authors_v4[authors_v4$author == tmp_dev, 3]
+  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
   microtask_owner$new_owner[i] <- tmp_id
 }
 
@@ -273,22 +302,32 @@ g_own
 
 # create N2 ---------------------------------------------------------------
 
+# The idea to build the N2 network came after the previous networks have been build. The code
+# below is specifically for N2. This is not memory efficient, as networks used above could be
+# used in the analysis below. 
+#
 # N2 is the network which combines interaction between domain ownership, and task 
 # interdependencies
 # developers own folders. each folder has a number of files. the folders a developer 
 # owns make up the domain s/he owns. 
 # 
-# N2 is composed of 3 matrices: Owernshi (MxN), task interdependencies (MxM), and the
+# N2 is composed of 3 matrices: Owernship (MxN), task interdependencies (MxM), and the
 # transpose of the ownership matrix
 # 
 # The owersnhip matrix shows which developer owns what file
 # The task interdependences show what files (N) are technically linked to each other
-# the transpose of the ownershup matrix shows what files are owned by a person
+# the transpose of the ownership matrix shows what files are owned by a person
 # 
-# step 1: multiply MxN matrix wiht a NxN matrix gets a MxN matric
+# The data set that shows the file interdependencies is task4. This does not contain file names
+# but file ids. As the matrices (ownership and task interdependencies) neeed to be matched
+# by rows and columns before they can be multiplied, fowner is not used. Fowner is a matrix
+# containing the folder owners and the file names. 
+# 
+# step 1: multiply MxN matrix with a NxN matrix gets a MxN matric
 # step 2: multiply MxN matrix from step 1 with NxM matrix 
 
-domain_own <- DF[,c(45,7)]
+# Checks before doing Step 1
+domain_own <- DF[,c(45,7)] #new owner - ID-file_und. 
 td <- task4
 
 # when multiplying the ownership matrix w/ the task interdependencies, the columns
@@ -299,16 +338,54 @@ td <- task4
 head(domain_own$ID_File_und, 100)
 
 # the function 'order' sorts the rows by the values in the ID_file_und column
+# the assumption is that both files will have ascending file ids
 domain_own <- domain_own[order(domain_own$ID_File_und),]
 head(domain_own$ID_File_und, 100)
 
 # Let's check the td file to make sure we have the same order
-
 head(td, 10)
+
+# for matrix multiplication, the number of columns in matrix 1 (ownership), need to be equal
+# to the number of rows in matrix 2 (task inderdependencies)
+dim(domain_own)
+dim(td)
+# two coding problems appear: First, domain_own is not yet a matrix. It's an edgelist. Second
+# domain_own has (or will have) 11938 columns and td has 16527 rows. 
+
+# DECISION: TURN DOMAIN_OWN TO A MATRIX, AND SAME FOR TD. THEN CHECK AGAIN. WHY THIS FIRST?
+# in a matrix, every pair of entries is unique. this means that the rows in td should be unique
+# and the columns in domain_own also
+
+# edgelist to matrix. 
+# domain_own is a 2 mode network (developer - file id). Project this to a dev-dev network
+head(domain_own)
+domain_own_developer <- as.matrix(bipart_to_row_projection(domain_own$new_owner, domain_own$ID_File_und)[[2]])
+domain_own_files <- as.matrix(bipart_to_col_projection(domain_own$new_owner, domain_own$ID_File_und)[[2]])
+
+# The ownership matrix is an adjaency matrix of developers and files. So a 2-mode edgelist
+# this needs to be converted into a 2 mode matrix
+domain_own_mat <- spMatrix(nrow=length(unique(domain_own$new_owner)),
+                           ncol=length(unique(domain_own$ID_File_und)),
+                           i = as.numeric(factor(domain_own$new_owner)),
+                           j = as.numeric(factor(domain_own$ID_File_und)),
+                           x = rep(1, length(as.numeric(domain_own$new_owner)))
+)
+dim(domain_own_mat)
+
 
 # weighted edgelist to sociomatrix
 library(amen)
 td_sm <- el2sm(as.matrix(td)) # this works
+
+# Now we have the two matrices: 
+# Ownership (dataset: domain_own_mat) and task interdependencies (td_sm)
+
+# Dimension check: for mat multiplication columns in M1 == rows in M2
+dim(domain_own_mat)
+dim(td_sm)
+
+
+
 
 # lets check the order of the td_sm file and the domain_own file. 
 rownames(td_sm) # inspecting the names of the rows in td
