@@ -358,48 +358,98 @@ dim(td)
 
 # edgelist to matrix. 
 # domain_own is a 2 mode network (developer - file id). Project this to a dev-dev network
-head(domain_own)
-domain_own_developer <- as.matrix(bipart_to_row_projection(domain_own$new_owner, domain_own$ID_File_und)[[2]])
-domain_own_files <- as.matrix(bipart_to_col_projection(domain_own$new_owner, domain_own$ID_File_und)[[2]])
+# head(domain_own)
+# domain_own_developer <- as.matrix(bipart_to_row_projection(domain_own$new_owner, domain_own$ID_File_und)[[2]])
+# domain_own_files <- as.matrix(bipart_to_col_projection(domain_own$new_owner, domain_own$ID_File_und)[[2]])
 
+# weighted edgelist to sociomatrix --> KBC: after our meeting on Nov 16th 2018 we 
+# discussed about including/excluding edge weights. The decision was to keep them in
+# But for testing purposes, I'm just doing it right now without edge weights
+# 
+# TODO: INCLUDE EDGE WEIGHTS
+# 
+#library(amen)
+#td_sm <- el2sm(as.matrix(td[,-4])) # this works, but takes long and makes 
+# my laptop crash
+
+td_net <- network(td[,1:2],matrix.type="edgelist",directed=TRUE) 
+
+# the next line is nonesense because domain_own is a 2 mode network. The goal of these
+# next lines is to reduce td_net a list of vertex that are present in both files. 
+domain_own_net <- network(domain_own, directed = F, matrix.type = 'edgelist')
+
+td_net
+domain_own_net
+# td_net has 135895 vertices whereas domain_own_net has 6155
+
+# workflow: 
+# 1. find the common set of vertices
+# 2. delete all vertices in td_net that are not in both sets
+
+shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character(domain_own_net%v%'vertex.names'))
+# the vector domain_own_net%v%'vertex.names' has the node names for the domain_own_network
+# These are character ID, ie. numbers that are stored as characters. They also have a
+# trailing white space (a white space between the " and the first number). This might 
+# create problems when matching.
+# Strip trailing white spaces from vertex names
+
+library(stringr)
+domain_own_net%v%'vertex.names' <- str_trim(as.character(domain_own_net%v%'vertex.names'))
+# domain_own is used as the basis against which the other network needs to be matched at
+# shared_vertices provides the index of nodes in td_net to keep.
+shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character(domain_own_net%v%'vertex.names'))
+
+# delete.vertices(network, vertex IDs) deletes the vertices in the network. The vertex
+# IDs are those given to the different nodes (the sequence at which they occur, not
+# the file ID). shared_vertices contains the IDs of those that we want to keep. This
+# needs to be turned around. Another approach is to induce a subgroup (get.induceedSubgraph)
+
+td_net_sub <- get.inducedSubgraph(td_net, v = shared_vertices)
+td_mat <- as.sociomatrix(td_net_sub)
+
+# Now we need to create the ownership matrix (dXf). domain_own is a 2 mode edgelist
 # The ownership matrix is an adjaency matrix of developers and files. So a 2-mode edgelist
 # this needs to be converted into a 2 mode matrix
-domain_own_mat <- spMatrix(nrow=length(unique(domain_own$new_owner)),
-                           ncol=length(unique(domain_own$ID_File_und)),
-                           i = as.numeric(factor(domain_own$new_owner)),
-                           j = as.numeric(factor(domain_own$ID_File_und)),
-                           x = rep(1, length(as.numeric(domain_own$new_owner)))
-)
-dim(domain_own_mat)
 
+# What could be added at this point is when a developer owned the file. 
+# domain_own_mat <- spMatrix(nrow=length(unique(domain_own$new_owner)),
+#                            ncol=length(unique(domain_own$ID_File_und)),
+#                            i = as.numeric(factor(domain_own$new_owner)),
+#                            j = as.numeric(factor(domain_own$ID_File_und)),
+#                            x = rep(1, length(as.numeric(domain_own$new_owner)))
+# )
 
-# weighted edgelist to sociomatrix
-library(amen)
-td_sm <- el2sm(as.matrix(td)) # this works
+idx <- which(domain_own$ID_File_und %in% as.character(td_net_sub%v%'vertex.names'))
+test <- domain_own[idx,]
+
+library(igraph) # detach afterwards
+domain_own_bip <- graph.data.frame(test, directed = F)
+V(domain_own_bip)$type <- V(domain_own_bip)$name %in% test[,2] #the second column of edges is TRUE type
+domain_own_bip
+
+idx <- which(as.character(td_net%v%'vertex.names') %in% as.character(V(domain_own_bip)$name))
+# 5761 true's
+
+# add to the index the position of developers. We want to keep them.
+vertex_idx <-which(V(domain_own_bip)$name %in% c(as.character(V(domain_own_bip)$name)[1:18], idx))
+
+# subset to keep only those vertices of type TRUE also present in td_net
+domain_own_sub <- induced_subgraph(domain_own_bip, vertex_idx, 'auto')
+# length is 5779. This includes the 18 developers. Without them it is 5761 file IDs
+# 
+# Transform bipartite network into affiliation matrix
+domain_own_mat <- as_incidence_matrix(domain_own_sub)
 
 # Now we have the two matrices: 
-# Ownership (dataset: domain_own_mat) and task interdependencies (td_sm)
+# Ownership (dataset: domain_own_mat) and task interdependencies (td_mat)
 
-# Dimension check: for mat multiplication columns in M1 == rows in M2
+# Dimension check: for mat multiplication M1 (col) == M2 (col)
 dim(domain_own_mat)
-dim(td_sm)
+dim(td_mat)
 
-
-
-
-# lets check the order of the td_sm file and the domain_own file. 
-rownames(td_sm) # inspecting the names of the rows in td
-
-# checking the length of both files that need to be matched
-length(rownames(td_sm))
-length(domain_own$ID_File_und)
-
-# they are not the same length. one has 3189 rows, the other 11938 
-
-table(duplicated(domain_own$ID_File_und))
-# domain_own has 5801 duplicated. 
-# what to do with the files that do not match
- 
+# create the collaboration needed matrix (CN). This is the IV network
+cn <-  (domain_own_mat %*% td_mat) %*% t(domain_own_mat)
+cn <- Matrix::crossprod(domain_own_mat, td_mat)
 
 # descriptives ------------------------------------------------------------
 
