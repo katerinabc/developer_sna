@@ -367,6 +367,7 @@ dim(td)
 # But for testing purposes, I'm just doing it right now without edge weights
 # 
 # TODO: INCLUDE EDGE WEIGHTS
+# TODO: include time information
 # 
 #library(amen)
 #td_sm <- el2sm(as.matrix(td[,-4])) # this works, but takes long and makes 
@@ -386,7 +387,6 @@ domain_own_net
 # 1. find the common set of vertices
 # 2. delete all vertices in td_net that are not in both sets
 
-shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character(domain_own_net%v%'vertex.names'))
 # the vector domain_own_net%v%'vertex.names' has the node names for the domain_own_network
 # These are character ID, ie. numbers that are stored as characters. They also have a
 # trailing white space (a white space between the " and the first number). This might 
@@ -395,36 +395,26 @@ shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character
 
 library(stringr)
 domain_own_net%v%'vertex.names' <- str_trim(as.character(domain_own_net%v%'vertex.names'))
-# domain_own is used as the basis against which the other network needs to be matched at
+# domain_own is the basis against which to match the other network
 # shared_vertices provides the index of nodes in td_net to keep.
 shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character(domain_own_net%v%'vertex.names'))
 
 # delete.vertices(network, vertex IDs) deletes the vertices in the network. The vertex
 # IDs are those given to the different nodes (the sequence at which they occur, not
 # the file ID). shared_vertices contains the IDs of those that we want to keep. This
-# needs to be turned around. Another approach is to induce a subgroup (get.induceedSubgraph)
+# needs to be turned around. 
+# After further thinking, another approach is to induce a subgroup 
+# (get.induceedSubgraph). That seems to be easier/more logical. 
 
 td_net_sub <- get.inducedSubgraph(td_net, v = shared_vertices)
 td_mat <- as.sociomatrix(td_net_sub)
-
-# Now we need to create the ownership matrix (dXf). domain_own is a 2 mode edgelist
-# The ownership matrix is an adjaency matrix of developers and files. So a 2-mode edgelist
-# this needs to be converted into a 2 mode matrix
-
-# What could be added at this point is when a developer owned the file. 
-# domain_own_mat <- spMatrix(nrow=length(unique(domain_own$new_owner)),
-#                            ncol=length(unique(domain_own$ID_File_und)),
-#                            i = as.numeric(factor(domain_own$new_owner)),
-#                            j = as.numeric(factor(domain_own$ID_File_und)),
-#                            x = rep(1, length(as.numeric(domain_own$new_owner)))
-# )
 
 idx <- which(domain_own$ID_File_und %in% as.character(td_net_sub%v%'vertex.names'))
 test <- domain_own[idx,]
 
 library(igraph) # detach afterwards
-domain_own_bip <- graph.data.frame(test, directed = F)
-V(domain_own_bip)$type <- V(domain_own_bip)$name %in% test[,2] #the second column of edges is TRUE type
+domain_own_bip <- graph.data.frame(domain_own, directed = F)
+V(domain_own_bip)$type <- V(domain_own_bip)$name %in% domain_own[,2] #the second column of edges is TRUE type
 domain_own_bip
 
 idx <- which(as.character(td_net%v%'vertex.names') %in% as.character(V(domain_own_bip)$name))
@@ -449,7 +439,55 @@ dim(td_mat)
 
 # create the collaboration needed matrix (CN). This is the IV network
 cn <-  (domain_own_mat %*% td_mat) %*% t(domain_own_mat)
-cn <- Matrix::crossprod(domain_own_mat, td_mat)
+dim(cn)
+
+
+# collaboration realized matrix -------------------------------------------
+# create the collaboration required matrix (CR). This is the DV network
+# 
+task_df <- domain_own <- DF[DF$ver == 4,c(1,7)]
+
+# limit task_df to the file id's included in the CN network. We'll be using
+# shared_vertices to subset task-df
+
+task_df <- as.matrix(domain_own[domain_own$ID_File_und %in% shared_vertices,])
+dim(task_df)
+class(task_df) # making sure that the object is a matrix
+mode(task_df) # making sure that the object is iin numeric mode. Not the case
+# right now. task_df is in character mode. Further test this.
+table(sapply(task_df, class))
+# which makes sense because it is an edgelist....
+# convert edgelist into matrix. I'm using the same code as above.
+
+library(igraph)
+task_df_bip <- graph.data.frame(task_df, directed = F)
+V(task_df_bip)$type <- V(task_df_bip)$name %in% task_df[,2] #the second column of edges is TRUE type
+task_df_bip
+# Transform bipartite network into affiliation matrix
+task_df_mat <- as_incidence_matrix(task_df_bip)
+
+mode(task_df_mat)
+cr <- task_df_mat %*% t(task_df_mat)
+dim(cr)
+
+# cr and cn do not have the same dimension. The following developers are not included
+# in cr
+dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])]
+
+# we are going to add them as vertexes into the bipartiate graph created above. 
+# Then we are transforming the bipatite network again into an incidence matrix
+V(task_df_bip)$name 
+V(task_df_bip)$name  <- stringr::str_trim(as.character(V(task_df_bip)$name)) #strip white spaces
+task_df_bip <- add_vertices(task_df_bip, 5, 
+                            name = dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])],
+                            type = FALSE)
+task_df_mat <- as_incidence_matrix(task_df_bip)
+dim(task_df_mat)
+detach("package:igraph", unload=TRUE)
+mode(task_df_mat)
+cr <- task_df_mat %*% t(task_df_mat)
+dim(cr)
+
 
 # descriptives ------------------------------------------------------------
 
@@ -466,6 +504,31 @@ ggplot(downer, aes(x = new_owner)) + geom_bar() + labs(title="Folder Onwership i
 
 gplot(reqc_net, diag=F, label = reqc_net %v%'vertex.names', edge.lwd=log(reqc_net%e%'weights') )
 
+# network: Needed collaboration
+library(ggraph)
+ggraph(graph.adjacency(cn, mode='undirected', weighted=T), layout='kk') + 
+  geom_edge_link(aes(start_cap = label_rect(node1.name),
+                     end_cap = label_rect(node2.name)), 
+                 arrow = arrow(length = unit(4, 'mm'))) + 
+  geom_node_label(aes(label = name)) + 
+  theme_graph()
+
+
+# network: Required collaboration
+ggraph(graph.adjacency(cr, mode='undirected', weighted=T), layout='kk') + 
+  geom_edge_link(aes(start_cap = label_rect(node1.name),
+                     end_cap = label_rect(node2.name)), 
+                 arrow = arrow(length = unit(4, 'mm'))) + 
+  geom_node_label(aes(label = name)) + 
+  theme_graph()
+
+# correlation between graphs
+
+
+
+# build statnet networks --------------------------------------------------
+
+# To run ERGM the graphs need to be loaded as network objects from the statnet package
 
 # valued ergm - basic model -----------------------------------------------
 
