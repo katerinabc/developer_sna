@@ -488,6 +488,17 @@ mode(task_df_mat)
 cr <- task_df_mat %*% t(task_df_mat)
 dim(cr)
 
+# Ok, we got cr and cn. For ERGM we need to make sure that the rownames in both 
+# matrices match.
+dimnames(cr)
+dimnames(cn)
+
+# Now we'll make sure the rows and columns in cr and cn are in the same order
+
+cr = cr[match(row.names(cn),row.names(cr)), match(colnames(cn),colnames(cr))]
+
+# Let's make sure (this will return 0 if we did it right):
+which(rownames(cr) != row.names(cn))
 
 # descriptives ------------------------------------------------------------
 
@@ -495,40 +506,151 @@ dim(cr)
 length(unique(microtask$author))
 
 # Barplot: Developer activity
-ggplot(microtask, aes(x = author)) + geom_bar() + labs(title="Developer Activity in version 4", x = 'Developer') + 
+ggplot(reshape::melt(cr), aes(x = X1, y = value)) + geom_col() + labs(title="Developer realized communication (ver 4) ", x = 'Developer') + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
 # barplot: Owners of folders
-ggplot(downer, aes(x = new_owner)) + geom_bar() + labs(title="Folder Onwership in version 4", x = 'Developer') + 
+ggplot(reshape::melt(cn), aes(x = X1, y = value)) + geom_col() + labs(title="Folder Onwership in version 4", x = 'Developer') + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
-
-gplot(reqc_net, diag=F, label = reqc_net %v%'vertex.names', edge.lwd=log(reqc_net%e%'weights') )
 
 # network: Needed collaboration
 library(ggraph)
-ggraph(graph.adjacency(cn, mode='undirected', weighted=T), layout='kk') + 
+ggraph(igraph::graph.adjacency(cn, mode='directed', weighted=T), layout='kk') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
   geom_node_label(aes(label = name)) + 
   theme_graph()
-
 
 # network: Required collaboration
-ggraph(graph.adjacency(cr, mode='undirected', weighted=T), layout='kk') + 
+ggraph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), layout='kk') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
   geom_node_label(aes(label = name)) + 
   theme_graph()
+
+
+# the graphs can be made nicer. Let me know what you like to see.
 
 # correlation between graphs
 
+cr_cn_corr = qaptest(list(cr,cn), gcor)
+cr_cn_corr <- netcancor(cr, cn, nullhyp = 'qap', reps = 10000)
+summary(cr_cn_corr)
+plot(cr_cn_corr$cdist)
 
+# simple linear regression (multiple quadratic assignment procedure)
+
+net.mod.1 <- netlm(cr, cn, reps=10000) # takes some time due to the high number of replication
+summary(net.mod.1) 
+
+# check in the summary the coefficient estimate. The result show that needed collaboration 
+# has a negative relation to realized collaboration. The estimate is -0.099 with a p value of 0.06
 
 # build statnet networks --------------------------------------------------
 
 # To run ERGM the graphs need to be loaded as network objects from the statnet package
+
+cr_net <- network (cr, directed=FALSE, ignore.eval=F, names.eval='weights')
+cr_net
+cr_net%e%'weights'
+
+cn_net <- network(cn, directed = TRUE, ignore.eval = F, names.eval = 'weights')
+cn_net
+cn_net%e%'weights'
+
+# Now we need to add individual attributes to the DV network. These are stored in
+# network g created further up (see 'create empty network g' line 133)
+
+g%v%'vertex.names'
+g%v%'developers'
+cr_net%v%'vertex.names'
+
+# test if the developers are in the same order
+g%v%'developers' == cr_net%v%'vertex.names'
+
+# the order of developers in cr_net is not the same than in g. can't simply assign
+# attributes. cr_net and cn_net are also missing some developers. 
+# First add missing people
+
+# check who is missing 
+as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))]
+
+# add the extra 4 people
+add.vertices(cr_net, 4)
+add.vertices(cn_net, 4)
+set.vertex.attribute(cr_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))],
+                     v = 19:22)
+set.vertex.attribute(cn_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cn_net%v%'vertex.names'))],
+                     v = 19:22)
+cr_net%v%'vertex.names'
+cn_net%v%'vertex.names'
+
+
+# order the matrices
+cr = cr[match(row.names(g),row.names(cr)), match(colnames(g),colnames(cr))]
+cn = cn[match(row.names(g),row.names(cn)), match(colnames(g),colnames(cn))]
+
+# add attributes
+
+participants <- NULL
+jobtitle <- NULL
+location <- NULL
+contract <- NULL
+
+# in the following loop information for developers who are members of version 2 is stored in a 
+# number of temporary files (all begnning with tmp_).
+# If a developer is not member of the version the number 99 is added. 
+for (i in get.vertex.attribute(cr_net, 'vertex.names')){
+  print(i)
+  tmp_ver <- authatt[authatt$author == i, 7]
+  if(2 %in% tmp_ver){present <- 1}else{present<-0}
+  participants <- cbind(participants, present)
+  
+  if(2 %in% tmp_ver){tmp_job <- authors_mbr_v2[authors_mbr_v2$author == i, 4]}else{tmp_job<- 99}
+  jobtitle <- cbind(jobtitle, tmp_job)
+  
+  if(2 %in% tmp_ver){tmp_loc <- authors_mbr_v2[authors_mbr_v2$author == i, 5]}else{tmp_loc<- 99}
+  location <- cbind(location, tmp_loc)
+  
+  if(2 %in% tmp_ver){tmp_con <- authors_mbr_v2[authors_mbr_v2$author == i, 6]}else{tmp_con<- 99}
+  contract <- cbind(contract, tmp_con)
+  
+}
+set.vertex.attribute(cr_net, 'ver2', as.numeric(t(participants)[,1]))
+set.vertex.attribute(cr_net, 'jobtitle', as.numeric(t(jobtitle)[,1]))
+set.vertex.attribute(cr_net, 'location', as.numeric(t(location)[,1]))
+set.vertex.attribute(cr_net, 'contract', as.numeric(t(contract)[,1]))
+
+# strength of familiarity is how often two developers worked on a previous version together
+# We will first calculate the affiliation matrix of develoepr - group membership
+# This will be transformed into a one-mode matrix (developer-developer) where the cell indicates
+# how often these two people worked on the same version
+familiarity <- authatt[,c(2,1)]
+library('Matrix')
+A <- spMatrix(nrow=length(unique(familiarity$author)),
+              ncol=length(unique(familiarity$ver)),
+              i = as.numeric(factor(familiarity$author)),
+              j = as.numeric(factor(familiarity$ver)),
+              x = rep(1, length(as.numeric(familiarity$author))) )
+row.names(A) <- levels(factor(familiarity$author))
+colnames(A) <- levels(factor(familiarity$ver))
+A
+
+fam_dev <- tcrossprod(A)
+
+fam_dev_net <- network(as.matrix(fam_dev), directed=F, ignore.eval=F, names.eval='weights')
+fam_dev_net%e%'weights'
+
+# messy graph
+ggraph(igraph::graph.adjacency(as.matrix(fam_dev), mode='undirected', weighted=T), layout='kk') + 
+  geom_edge_link(aes(start_cap = label_rect(node1.name),
+                     end_cap = label_rect(node2.name)), 
+                 arrow = arrow(length = unit(4, 'mm'))) + 
+  geom_node_label(aes(label = name)) + 
+  theme_graph()
+
 
 # valued ergm - basic model -----------------------------------------------
 
@@ -537,188 +659,50 @@ ggraph(graph.adjacency(cr, mode='undirected', weighted=T), layout='kk') +
 # 
 # independent variables = required communication based on file dependencies
 
-base <- ergm(g_mt ~ sum, response="freq_collab", reference=~Geometric)
+base <- ergm(cr_net ~ sum, response="weights", reference=~Geometric)
 
 
 # valued ergo - model building --------------------------------------------
 
-ggplot(as.data.frame(g_mt%e%'freq_collab'), aes(x =g_mt %e% "freq_collab")) + geom_bar() + 
+ggplot(as.data.frame(cr_net%e%'weights'), aes(x =cr_net %e% "weights")) + geom_bar() + 
   labs(title="Distribution of Collaboration values", x = 'Frequency of Collaboration', y = 'Count')
 
-ggplot(as.data.frame(g_req %e% "req_comm"), aes(x =g_req %e% "req_comm")) + 
+ggplot(as.data.frame(cn_net %e% "weights"), aes(x =cn_net %e% "weights")) + 
   geom_bar() + 
-  labs(title="Distribution of required communication values", 
-       x = 'Frequency of Required Communication', 
+  labs(title="Distribution of needed communication values", 
+       x = 'Frequency of Needed Communication', 
        y = 'Count')
 hist(g_req %e% "req_comm")
 
-m1 <- ergm(g_mt ~ sum + nonzero()
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m1)
-# no convergence
+m1a <- ergm(cr_net ~ sum + nonzero()
+           + edgecov(cn_net, attrname = 'weights', form='sum')
+           + edgecov(fam_dev_net, attrname = 'weights', form='sum')
+           , response="weights", reference=~Poisson)
+mcmc.diagnostics(m1a)
+summary(m1a)
 
-m1 <- ergm(g_mt ~ sum 
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m1)
-summary(m1)
-# converged
-# Explanations: All phrased if the effect size is positive
-# the effects are expresssed as log odds. Take the exponential to get the odds
-# sum = the chance that two developers work on the same file
-# edgecov = 
+m1b <- ergm(cr_net ~ sum + nonzero()
++ edgecov(fam_dev_net, attrname = 'weights', form='sum')
+, response="weights", reference=~Poisson)
+mcmc.diagnostics(m1b)
+summary(m1b)
 
+# other terms to include:
+# homophily hypothesis
+# nodematch('jobtitle'), nodematch('location'), nodematch('contract')
+# nodefactor('jobtitle') # 
+# nodesqrtcovar(center=T) # individual tendency to work
+# transitiveweights("min","max","min") 
+# cyclicalweights("min","max","min")
 
-m2 <- ergm(g_mt ~ sum 
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           + nodematch('jobtitle')
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m2)
-summary(m2)
-# not converged. 
+# add control for the MCMC chain
+# , control = control.ergm(MCMC.samplesize = 5000,
+                                    # MCMC.interval = 2024,
+                                    # MCMC.burnin = 50000,
+                                    # MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+                                    # )
 
-# m3 with control variables  ------------------------------------------------------------
-
-ggplot(as.data.frame(g_own%e%'freq_own'), aes(x =g_own %e% "freq_own")) + geom_bar() + 
-  labs(title="Distribution of Ownership values", x = 'Frequency of Ownership', y = 'Count')
-
-
-m3 <- ergm(g_mt ~ sum 
-           # control variables (homophily)
-           + nodematch('jobtitle')
-           + nodematch('location')
-           + nodematch('contract')
-           # control variables (hierarchy)
-           #+ nodefactor('jobtitle') # I think this term causes non convergence. see m2
-           # control variables (network structures)
-           + nodesqrtcovar(center=T) # individual tendency to work
-           + transitiveweights("min","max","min") 
-           + cyclicalweights("min","max","min")
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m3)
-summary(m3)
-
-# convergence not reached. try with smaller model and build it up
-
-m3 <- ergm(g_mt ~ sum 
-           # control variables (homophily)
-           + nodematch('jobtitle')
-           #+ nodematch('location')
-           #+ nodematch('contract')
-           
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m3)
-summary(m3)
-
-# did not converge
-
-m3 <- ergm(g_mt ~ sum 
-           # control variables (homophily)
-           #+ nodematch('jobtitle')
-           + nodematch('location')
-           #+ nodematch('contract')
-           
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m3)
-summary(m3)
-
-# not convergences
-
-
-m3 <- ergm(g_mt ~ sum 
-           # control variables (homophily)
-           #+ nodematch('jobtitle')
-           #+ nodematch('location')
-           + nodematch('contract')
-           
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson)
-mcmc.diagnostics(m3)
-summary(m3)
-
-# not converged
-
-m3 <- ergm(g_mt ~ sum 
-           # control variables (homophily)
-           #+ nodematch('jobtitle')
-           #+ nodematch('location')
-           #+ nodematch('contract')
-           
-           # control variables (structural terms)
-           + nodesqrtcovar(center=T) # individual tendency to work
-           + transitiveweights("min","max","min") 
-           + cyclicalweights("min","max","min")
-           
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(MCMC.samplesize = 5000,
-                                    MCMC.interval = 2024,
-                                    MCMC.burnin = 50000,
-                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-                                    )
-)
-mcmc.diagnostics(m3)
-summary(m3)
-
-# did not converge
-# something to curb the nodesqrrtcovar effect. it is not only going up. 
-# it needs to be dampened
-
-mean_collab <- mean(g_mt%e%'freq_collab')
-sd_collab <- sd(g_mt%e%'freq_collab')
-mean_collab + sd_collab
-
-
-m3 <- ergm(g_mt ~ sum + nonzero()
-           # control variables (homophily)
-           #+ nodematch('jobtitle')
-           #+ nodematch('location')
-           #+ nodematch('contract')
-           
-           # control variables (structural terms)
-           + nodesqrtcovar(center=F) # individual tendency to work
-           + transitiveweights("min","max","min") 
-           #+ cyclicalweights("min","max","min")
-           + atleast(mean_collab + sd_collab)
-           #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-)
-
-
-# converged
-# 
-# Try 1: tested with  + atleast(mean_collab + sd_collab) + equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
-# and an increased mcmc sampling chain, but the chains didn't mix at all
-# Outcome: 
-# 1: cyclicalweights.min.max.min are at their smallest attainable values. Their coefficients will be fixed at -Inf.
-# 2: no convergence
-# Try 2: take out cyclicalweights
-mcmc.diagnostics(m3)
+# previous notes:
 # converged byt lots of NaN (zero standard deviation) for nonzero nodesqrtcovar, transweight
 # atleast, edgeoc req_comm
 # 
@@ -727,148 +711,9 @@ mcmc.diagnostics(m3)
 # This is not detected in valued ergm as a sum could be 0.
 # this could be because no one as values 1st above the mean --> 7 edge values
 # are 1 sd above mean
-# observation: effect for nonzero huge. rerun m3 but controlling for zero inflation. 
-# rerun as m4 to compare
-summary(m3)
+# atleast(mean_collab + sd_collab)
+#+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
 
-m4 <- ergm(g_mt ~ sum + nonzero()
-           # control variables (homophily)
-           #+ nodematch('jobtitle')
-           #+ nodematch('location')
-           #+ nodematch('contract')
-           
-           # control variables (structural terms)
-           + nodesqrtcovar(center=F) # individual tendency to work
-           + transitiveweights("min","max","min") 
-           #+ cyclicalweights("min","max","min")
-           + atleast(mean_collab + sd_collab)
-           #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-           ))
-# converged
-mcmc.diagnostics(m4)
-#  In cor(as.matrix(x)) : the standard deviation is zero
-#  observations for m4: bit better model (smaller bic/aic). also variation in edgecov(g_own)
-#  
-summary(m4)
-
-m5 <- ergm(g_mt ~ sum + nonzero()
-           # control variables (homophily)
-           + nodematch('jobtitle')
-           #+ nodematch('location')
-           #+ nodematch('contract')
-           
-           # control variables (structural terms)
-           + nodesqrtcovar(center=F) # individual tendency to work
-           + transitiveweights("min","max","min") 
-           #+ cyclicalweights("min","max","min")
-           + atleast(mean_collab + sd_collab)
-           #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(MCMC.samplesize = 5000,
-                                    MCMC.interval = 2024,
-                                    MCMC.burnin = 50000,
-                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-                                    
-           ))
-
-# model converged. 
-# on second run:  Approximate Hessian matrix is singular.
-mcmc.diagnostics(m5)
-
-m6 <- ergm(g_mt ~ sum + nonzero()
-           # control variables (homophily)
-           + nodematch('jobtitle')
-           #+ nodematch('location')
-           #+ nodematch('contract')
-           
-           # control variables (structural terms)
-           + nodesqrtcovar(center=F) # individual tendency to work
-           + transitiveweights("min","max","min") 
-           #+ cyclicalweights("min","max","min")
-           #+ atleast(mean_collab + sd_collab)
-           + equalto(mean(g_mt%e%'freq_collab', tolerance = sd_collab))
-           # hypothesis testing
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(
-                                    # MCMC.samplesize = 5000,
-                                    # MCMC.interval = 2024,
-                                    # MCMC.burnin = 50000,
-                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-           ))
-# Error in solve.default(H, tol = 1e-20) : Lapack routine dgesv: system is exactly singular: U[2,2] = 0
-# discard model 6
-
-m7 <- ergm(g_mt ~ sum + nonzero()
-           + nodematch('jobtitle')
-           + mutual(form = "min", threshold = mean(g_mt%e%'freq_collab'))
-           
-           
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(MCMC.samplesize = 5000,
-                                    MCMC.interval = 2024,
-                                    MCMC.burnin = 50000,
-                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-                                    
-           ))
-# no convergence after 20 iterations
-m8 <- ergm(g_mt ~ sum + nonzero()
-           + nodematch('jobtitle')
-           + mutual(form = "min", threshold = mean(g_mt%e%'freq_collab'))
-           
-           + transitiveweights("min","max","min") 
-           
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(MCMC.samplesize = 5000,
-                                    MCMC.interval = 2024,
-                                    MCMC.burnin = 50000,
-                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-                                    
-           ))
-
-# no convergence after 20 iterations
-# 
-# observations: adding mutual to the model leads to convergence problems (m7, m8)
-
-# model 4 to 8 don't yield good results. 
-
-m9 <- ergm(g_mt ~ sum + nonzero()
-           + nodematch('jobtitle')
-           
-           + transitiveweights("min","max","min") 
-           
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(#MCMC.samplesize = 5000,
-                                    #MCMC.burnin = 50000,
-                                    #MCMC.interval = 2024,
-                                    MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-                                    
-           ))
-
-mcmc.diagnostics(m9)
-# low p-values in mcmc.diagnostics.
-# upward trend for transitive weights and edgecov _req_comm
 
 m9.1 <- ergm(g_mt ~ sum# + nonzero()
            + nodematch('jobtitle')
