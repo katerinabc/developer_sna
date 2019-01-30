@@ -1,22 +1,34 @@
 # Microdynamics in Software developer teams
 
-**work-in-progress Paper**
 ## Data
 
-The dataset consists of a 2 mode network linkig developer to software files. The edge is the work a developer has done on the file (a = added, m = modified). Additional data is available about developers (e.g., job role, work-location, type of contract) and about the software files (tecnical dependencies between software files)
+The dataset consists of a 2 mode network linkig developer to software files. The edge is the work a developer has done on the file (a = added, m = modified). Additional data is available about developers (e.g., job role, work-location, type of contract) and about the software files (tecnical dependencies between software files). 
 
+## Dependent network
 
+The dependent network is the **realized communication** between developers (`cr_net` in `version4_mirrioring.R`). It measures how often two developers were communicating with each otehr. Communication here refers to making changes in the same file. 
+Realized collaboration is $\Task_{d,f} X Task_{d,f}^T$. $Task_{d,f}$ refers to the matrix of developrs and file ownership. 
 
-## Task 1: Replication of Sosa (2015) paper
+## Independent Network
+The independent network is the **needed communication** between developers (`cn_net` in `version4_mirrioring.R`).It measures how often two developers should have been communicating. Communication in this context refers to *making changes in a file*. Communication between two developers is required if the developers have ownership on files which are technically dependent on each other. Two files are technically dependent on each other, if file 1 makes a reference to objects/functions in file 2. When something is changed in file 1, it is necessary to check file 2 to ensure no bug is created. *Ownership* is defined in the following way:
+1. The developer who created first a folder owns the files that are in the folder. 
+2. If a developer is not anymore member of the project, s/he looses ownership of the files of the previously owned folder. 
+3. Ownership of the folder is transferred to the first developer who makes a change to files in the respective folder.  
+Needed collaboration is $\Ownership_{d,f} X Dependencies_{f,f} X Ownership_{d,f}^T$. $\Ownership_{d,f}$ is the matrix describing who owns what folder. $\Dependencies_{f,f}$ is the square matrix listening the technical dependencies between folders. The task dependencies matrix currently does not take into account how strongly two files are dependent on each other. 
 
-A full replication of the methodology by Sosa is only possible if the data is dichotomized. The  developer-to-developer network is a projection of the 2-mode matrix: Developer - Software file. The devleoper-to-developer matrix indicates which two developer worked on a file. It is an undirected  *collaboration* network. 
+Important for calculating `cn_net` was that the files in the ownership matrix are also the files in the task dependencies matrix. Files that appeared in one matrix, but not in the other one, needed to be deleted. Additionally, the names of the files needed to be in the same sequence in both matrices. Line 303 - 443 describe the process:
+1. Create a bipartite graph with developers and files they own based on folder ownership. 
+2. Create a graph with file dependencies. 
+3. For each graph, extract the vertex names. For the first graph, the biparite graph, names are developers and file ids. For the second graph the name is only file ids. 
+4. Match the two vertex names. The names in the bipartite graph serve as a reference. This means that all file ids not in the Onwernship matrix will be excluded from the task dependencies. 
+5. Create a subgroup from the 2nd graph (file depencnies), keeping only the files which are also in the ownership file. 
+6. Transform the graphs into matrices and do the multiplication necessary to create `cr_net` (line 442).
 
-To run an ERGM the dependent network needs to contain binary data. 
+After the two networks are created, I checked if the same people are in the networks (line 474 - 486). Those that were missing were added to the task dependencies network. I only added the nodes with no edges to anybody.
 
-The collaboration matrix for each software version is pretty small (see Figure 1), therefore running a valued ERGM on the complete network taking all collaboration into account is better. Figure 2 visualizes the complete network. 
+## Familiarity between developers
+Familiarity between developers is the number of times two developers worked on a previous version of the software together. 
 
-![Collaboration Network for Software v1.](fig/ugly_dev_1_network.png)
-![Collaboration Network for Software development.](fig/developer_1_mode_projection.png)
 
 ### Valued ERGM
 For valued ERGMs it is necessary to provide a reference distribution. The space from which to draw sample networks. For example if the values in the networks can only be 0 or 1 then the sample distirbution is a uniform or truncated geometric distribution or a binominal distribution. In case there is no upper bound on the values of ties a *geometric* or *Poission* distribution should be used. Andy Pilny argues that the Poisson distribution is useful when average tie value isn't much different to the variance. If this is not the case geometric distribution should be used. This makes geometric distribution very useful for very skewed distribution of edge values, where most nodes are 0.
@@ -102,17 +114,10 @@ g_mt
 gplot(g_mt)
 ```
 
-### Hypothesis for model 1
-Model 1 does not make a distinction between the type of relationship
-The following effects are included:
-1. sum: Sum is the valued version of edges. It controls for the general intensity of relationships in the network (control variable).
-2. nonzero: Might be excluded. In sparse matrices, this term accounts for the possibility of a tie, when most ties are zero (control variable). 71 % of relationships do not exist.
-3. Nodematch - location: This test if relationships are influenced by location (homophily argument). 
-4. Nodematch - Title: This test if relationships are influenced by title (homophily argument).
-5. Nodematch - Contract: This test if relationships are influenced by title (homophily argument).
-6. Nodesqrtcovar: Individuals have different propensity to interact. This terms accounts for the individual differences (control variable).
-7. Transitiveweights: A stable/ common social structure are triads. As we are modeling the appearance of relationships, taking into account that ties often appear in clusters, helps to get a better understanding of the effects. A negative transitive weights sugest hiearchical structures as ties are not formed with everyone equally. Transitiveweights takes 3 arguments: twopath, combine, affect. The default values of 'min', 'max', and 'min' are used. Twopath measures the strenght ot the two paths between i and k, and k and j). Given the strength of the two paths from i to k and k to j, combine measures their strenght on the path i to j. Finally, given this combined strenght, what is its affect on the the relationship i to j. 
+## Technical information
+`data_import.R` imports and cleans the datasets. In that file the following objects are created:
+* DF: data set with *microtasks*. This is the export Mahdi got from the software company. It describes every event during software development, meaning all the files that were created and modified. 
+* DF2: data set with file dependencies. It shows how often a file is dependent on another file. 
+* authatt: data set with information about developers for each version. 
 
-- occurence of non-mirroring is more likely when performing routine tasks vs innovative tasks --> measured using edgecov (covariate)
-###
-
+`version4_mirroring.R` contains the script necessary to create the needed and realized collaboration networks. It also contains the valued ergms. Due to changes in operationalization of realized and needed collaboration, the script can be confusing. All information is left in for auditing purposes. Line 62 - 301 describe the old method. 

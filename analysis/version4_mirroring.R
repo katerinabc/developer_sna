@@ -328,6 +328,7 @@ g_own
 
 # Checks before doing Step 1
 domain_own <- DF[,c(45,7)] #new owner - ID-file_und. 
+task4 <- DF2[DF2$file == '1.5',]
 td <- task4
 
 # when multiplying the ownership matrix w/ the task interdependencies, the columns
@@ -445,7 +446,7 @@ dim(cn)
 # collaboration realized matrix -------------------------------------------
 # create the collaboration required matrix (CR). This is the DV network
 # 
-task_df <- domain_own <- DF[DF$ver == 4,c(1,7)]
+task_df <- DF[DF$ver == 4,c(1,7)]
 
 # limit task_df to the file id's included in the CN network. We'll be using
 # shared_vertices to subset task-df
@@ -505,31 +506,49 @@ which(rownames(cr) != row.names(cn))
 # Number of develoers in version 4
 length(unique(microtask$author))
 
-# Barplot: Developer activity
-ggplot(reshape::melt(cr), aes(x = X1, y = value)) + geom_col() + labs(title="Developer realized communication (ver 4) ", x = 'Developer') + 
+# Barplot: Developer activity in version 4
+ggplot(DF[DF$ver==4,], aes(x = author)) + geom_bar() + labs(title="Developer activity in version 4",
+                                                subtitle ='Number of events developer logged',
+                                                x = 'Developer') + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
+ggsave('nbr_events_per_develoepr_ver4.png')
 
 # barplot: Owners of folders
-ggplot(reshape::melt(cn), aes(x = X1, y = value)) + geom_col() + labs(title="Folder Onwership in version 4", x = 'Developer') + 
+ggplot(DF[DF$ver == 4,], aes(x = new_owner)) + geom_bar() + labs(title="Folder Onwership in version 4", 
+                                                                 subtitle = 'Number of folder a developer owns',
+                                                                 x = 'Developer') + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
+ggsave('nbr_folders_per_develoepr_ver4.png')
+
+
+ggplot(reshape2::melt(cr), aes(Var1, Var2, fill=log(value))) + geom_tile() + 
+  labs('Realized collaboration between developers', x = 'Developers', y = 'Developers') + 
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+ggsave('realized_collab.png') 
+
+ggplot(reshape2::melt(cn), aes(Var1, Var2, fill=log(value))) + geom_tile() + 
+  labs('Needed collaboration between developers', x = 'Developers', y = 'Developers') + 
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+ggsave('needed.collab.png')
 
 # network: Needed collaboration
 library(ggraph)
-ggraph(igraph::graph.adjacency(cn, mode='directed', weighted=T), layout='kk') + 
+ggraph(igraph::graph.adjacency(cn, mode='directed', weighted=T), layout='lgl') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
   geom_node_label(aes(label = name)) + 
   theme_graph()
+igraph::write.graph(igraph::graph.adjacency(cn, mode='directed', weighted=T), 'needed.collab.graphml')
 
 # network: Required collaboration
-ggraph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), layout='kk') + 
+ggraph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), layout='auto') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
   geom_node_label(aes(label = name)) + 
   theme_graph()
-
+igraph::write.graph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), 'realized.collab.graphml')
 
 # the graphs can be made nicer. Let me know what you like to see.
 
@@ -628,6 +647,7 @@ set.vertex.attribute(cr_net, 'contract', as.numeric(t(contract)[,1]))
 # This will be transformed into a one-mode matrix (developer-developer) where the cell indicates
 # how often these two people worked on the same version
 familiarity <- authatt[,c(2,1)]
+familiarity <- familiarity[familiarity$ver < 5,]
 library('Matrix')
 A <- spMatrix(nrow=length(unique(familiarity$author)),
               ncol=length(unique(familiarity$ver)),
@@ -644,12 +664,15 @@ fam_dev_net <- network(as.matrix(fam_dev), directed=F, ignore.eval=F, names.eval
 fam_dev_net%e%'weights'
 
 # messy graph
-ggraph(igraph::graph.adjacency(as.matrix(fam_dev), mode='undirected', weighted=T), layout='kk') + 
-  geom_edge_link(aes(start_cap = label_rect(node1.name),
+famdev <- ggraph(igraph::graph.adjacency(as.matrix(fam_dev), mode='undirected', weighted=T), layout='kk') + 
+  geom_edge_link(aes(color = (weight), 
+                     start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
-                 arrow = arrow(length = unit(4, 'mm'))) + 
+                 arrow = arrow(length = unit(2, 'mm')),
+                 show.legend=T) + 
   geom_node_label(aes(label = name)) + 
   theme_graph()
+ggsave('fam_developers.png', famdev)
 
 
 # valued ergm - basic model -----------------------------------------------
@@ -676,16 +699,33 @@ hist(g_req %e% "req_comm")
 
 m1a <- ergm(cr_net ~ sum + nonzero()
            + edgecov(cn_net, attrname = 'weights', form='sum')
-           + edgecov(fam_dev_net, attrname = 'weights', form='sum')
-           , response="weights", reference=~Poisson)
-mcmc.diagnostics(m1a)
+           , response="weights", reference=~Geometric)
+mcmc.diagnostics(m1a) # look at the generated plots. For the left side you want to see kinda straight
+# lines, no upward or downward trend. For the right ones you want to see normal curves.
+# If you dont' get that, you can't trust the results. The MCMC simulation isn't stable. 
 summary(m1a)
 
 m1b <- ergm(cr_net ~ sum + nonzero()
 + edgecov(fam_dev_net, attrname = 'weights', form='sum')
-, response="weights", reference=~Poisson)
+, response="weights", reference=~Geometric)
 mcmc.diagnostics(m1b)
 summary(m1b)
+
+m2 <- ergm(cr_net ~ sum + nonzero()
+              #+ edgecov(fam_dev_net, attrname = 'weights', form='sum')
+              + edgecov(cn_net, attrname = 'weights', form = 'sum')
+              # attributes 
+              + nodematch('jobtitle')
+              #+ nodematch('location') 
+              #+ nodematch('contract')
+              #+ nodefactor('jobtitle')
+              #+ nodesqrtcovar(center=T) # individual tendency to work
+              # + transitiveweights("min","max","min") 
+              # + cyclicalweights("min","max","min")
+              
+              , response="weights", reference=~Geometric)
+mcmc.diagnostics(m2)
+summary(m2)
 
 # other terms to include:
 # homophily hypothesis
@@ -702,7 +742,10 @@ summary(m1b)
                                     # MCMC.prop.weights='0inflated' # to control for skweded degree distribution
                                     # )
 
-# previous notes:
+
+# previous notes ----------------------------------------------------------
+
+
 # converged byt lots of NaN (zero standard deviation) for nonzero nodesqrtcovar, transweight
 # atleast, edgeoc req_comm
 # 
