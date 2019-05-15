@@ -3,18 +3,75 @@
 # clean your workspace first 
 rm(list=ls())
 
+
+# very important ----------------------------------------------------------
+
+# when analsying interaction in a different version check this file carefully for any subsets created
+# by taking only 1 version. 
+# 
+# see line:
+# 
+
+
+# INSTRUCTION FOR USING THE FILES -----------------------------------------
+
+########## READ THIS BEFORE RUNNING THE ANALYSIS ####################
+
+# Several scripts are used to clean up the data and transform it so that it is ready for the analysis.
+
+# data_import.R imports the data, glues the different csv files together and changes the name 
+# of the versions. 
+# 
+# ownership_developer_sna.R assignes correct folder ownership. This script runs per version.
+# So ownership assignment is done for each version separately. This means this file needs to be run
+# for each version.
+# 
+# version4_mirroring.R creates the networks and runs a sample ergm. 
+# 
+# Tip1: the line load('clean_data.RData') is there to save you time IF you analyze 1 version. 
+# The last line in the file ownership_developer_SNA.R creates a R object called 'clean_data.RData'.
+# This R Object contains all the data sets that are created when running the file onwership_developer_sna.R
+# So if on a Monday you work on analyzing version 2, on tuesday you can just reload the R Object
+# and you don't have to rerun the ownership file. But if you want to analyze version 1, you need
+# to re-run the file ownership_developer_sna.R, change the lines that refer to version 2 to refer to
+# version 1, and then you can start analyzing. If you switch again to version 2 on Thursday, you 
+# have to rerun the files etc. 
+# The IMPORTANT thing to remember is that 'clean_data.RData' can save you time, but will mess up
+# everything if you don't keep track what version you are working on. 
+
+# Tip2: To run a R script within a R script you write source(file name) as written in line 47. The 
+# option echo=F (or T for true) is for not showing output in the console. 
+
 # By runnin the next line of code, all the required data objects
 # are created. This is not necessary if you have a saved RData file (see line 11)
-#source('ownership_developer_sna.R', echo=T)
+source('ownership_developer_sna.R', echo=T)
 
 # Load the cleaned and prepared data
-load('clean_data.RData')
+# This file is the result of running ownership_developer_sna.R
+# ownership_developer_sna.R is dependent on data_import.R
+# load('clean_data.RData')
+
+
+# changing versions -------------------------------------------------------
+
+# On line 240 it says task_v2 <- DF2[DF2$file == "1.5",] 
+# If you want to work with a different version change the 1.5 into the version you want to work with
+# to be sure about the names of version you can run unique(DF2$file)
+# 
+# reqcomm is based on sender_name, receiver_name and task_v2$weight (see line 283). 
+# If you adapt task_v2 to the version you like to analzye, task_v2$weight is adapted. 
+# sender_name and receiver_name are also based on task_v2 (see line 254 - 259). In addition they 
+# are based on the file ownership_withid, which contains all versions
+# sender_name is created by matching the file Ids in the column sender in the obejct task_v2 with 
+# the file ids in the object ownership_withid. The same process is used for receiver_name, 
+# just using the file Ids marked as receiver id in task_v2
+
+# preamble ----------------------------------------------------------------
+
 
 # This file contains functions created for this project
 source('functions_developer_sna.R', echo=F)
 
-# detach igraph package as it conflicts with ergm pacakge
-detach("package:igraph", unload=TRUE)
 library(statnet)
 # Needed data:
 # developer-file workflow: named: microtask
@@ -35,13 +92,29 @@ library(statnet)
 
 # data --------------------------------------------------------------------
 
-microtask_file <- DF[DF$ver == 4, c(1,2)] # edgelist: author - file
-microtask_folder <- DF[DF$ver == 4, c(1,42)] # edgelist: autor - folder
-microtask_owner <- DF[DF$ver == 4, c(1, 45)] # edgelist: author - folder owner (FO)
-fowner <- DF[DF$ver == 4, c(2, 45)] # edgelist: file - folder owner (FO)
-downer <- DF[DF$ver == 4, c(42,45)] # edgelist: folder - folder owner (FO)
+# this is going to be confusing! in DF the column ver refers to the new version naming (version 1 
+# until 11)
+# in authatt ver refers to the new version nameing View the files if you want
+# View(authatt)
+# 
+working_version <- 2 # use this to indicate the version you are working on. In this way you
+# only have to change this line and the rest is adapted
+file_number <- '1.5' # use this to indicate the file number (the old version names)
+
+microtask_file <- DF[DF$ver == working_version, c(1,2)] # edgelist: author - file
+microtask_folder <- DF[DF$ver == working_version, c(1,42)] # edgelist: autor - folder
+microtask_owner <- DF[DF$ver == working_version, c(1, 45)] # edgelist: author - folder owner (FO)
+fowner <- DF[DF$ver == working_version, c(2, 45)] # edgelist: file - folder owner (FO)
+downer <- DF[DF$ver == working_version, c(42,45)] # edgelist: folder - folder owner (FO)
 taskdep <- task_v2 # dataset: file id (sender), file id (receiver), weight dependency, software version (old), software version (new)
 reqcomm <- reqcomm_v2 # edgelist: FO sender file, FO receiver file, weight dependency
+
+
+# to create taskdep for other versions you need to do the following:
+# taskdep is now based on task_v2. This object has been created in the file 
+# ownership_developer_sna.R This means you should be changing the line 240 by changing the version 
+# number
+# 
 
 # create one set of nodes with names of working in v2 or not
 
@@ -49,254 +122,255 @@ reqcomm <- reqcomm_v2 # edgelist: FO sender file, FO receiver file, weight depen
 authatt$author<-as.character(authatt$author)
 authatt<- rbind(authatt, c(4, "external_owner", 22, 99, 99, 99)) # add a row of entries for artificial developer
 authors_v2 <- authatt[,c(2,1)]
-authors_v2$v2 <- authatt$ver2 == 2 # add logical vector for membership
-authatt$v2 <- authatt$ver2 == 2
+authors_v2$v2 <- authatt$ver == working_version # add logical vector for membership
+authatt$v2 <- authatt$ver == working_version
 
 # all developers, but only unique information (not version memebrship information)
 authors_unique <- authatt[!duplicated(authatt$author),]
 
 # authors working in version 2 only
-authors_mbr_v2 <- authatt[authatt$ver2 == 2,]  
+authors_mbr_v2 <- authatt[authatt$ver == working_version,]  
 
 
-# create networks ---------------------------------------------------------
+# # create networks ---------------------------------------------------------
+# 
+# # The basis for most of the networks is a bipartite edgelist. This edgelist is sometimes weighted. 
+# # To transfrom the bipartite edgelist into a one mode network with only developers, the following 
+# # steps are done:
+# # bipartite_to_row_projection is a function (see file functions_developer_sna) that creates a 
+# # matrix based on the egelist. This function only works for non-weighted edgelist (frequency
+# # edgelist). The output of this function is transformed into a matrix.
+# # The matrix is transformed into a network with as.network.
+# # Network description are added as needed.
+# 
+# # microtask_file is a 2 mode network (developer - file). Project this to a dev-dev network
+# head(microtask_file)
+# mt_file <- as.matrix(bipart_to_row_projection(microtask_file$author, microtask_file$Filename)[[2]])
+# # nodes = developer
+# # edges = number of times developers worked on same file
+# 
+# mtfi_net <- as.network(mt_file, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
+# mtfi_net %v% 'vertex.names'
+# 
+# 
+# # microtask_folder is a 2 mode network (developer - folder). Project this to a dev-dev network
+# head(microtask_folder)
+# mt_folder <- as.matrix(bipart_to_row_projection(microtask_folder$author, microtask_folder$folder_names)[[2]])
+# # nodes = developer
+# # edges = number of times  developers worked on files located in the same folder
+# mtfo_net <- as.network(mt_folder, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
+# gplot(mtfo_net, label=mtfo_net%v%'vertex.names') # fig not for publication
+# 
+# head(microtask_owner)
+# mt_owner <- network(microtask_owner, directed=T, matrix.type='e')
+# # nodes = developers
+# # edges = number of times developers worked on a file owned by someone else
+# gplot(mt_owner, label=mt_owner%v%'vertex.names') # this draws the network. Figure is not for publication
+# 
+# # downer is a 2 mode network (developer - folder). 
+# head(downer)
+# down <- bipart_to_row_projection(downer$new_owner, downer$folder_names)[[2]]
+# # Great check. Only self-loops
+# # nodes = developer
+# # edges = number of times 2 developers own the same folder.  
+# 
+# # make reqcomm into a network. it is already a 1 mode network (dev-dev)
+# reqcomm <- as.data.frame(reqcomm)
+# reqcomm$V3 <- as.numeric(as.character(reqcomm$weights))
+# 
+# # summarize reqcomm per unique node-node pair.
+# library(dplyr)
+# reqcomm_grp <- reqcomm %>% group_by(sender_name, receiver_name) %>% summarize(weights = sum(V3))
+#  
+# reqc_net <- network(reqcomm_grp, directed=T, matrix.type='e', ignore.eval=F, names.eval='weights')
+# reqc_net
+# reqc_net %v%'vertex.names'
+# head(reqc_net %e%'weights')
+# # take 'not.modified' node out
+# #delete.vertices(reqc_net, which(reqc_net%v%'vertex.names' == 'not.modified'))
+# gplot(reqc_net, label=reqc_net%v%'vertex.names', edge.lwd = log(as.vector(reqc_net%e%'weights'))) # fig not for publication
+# 
+# 
+# # find developers who should be communicating, but are not in mtfo_net.
+# # Add these to the network
+# matches <- as.vector( (reqc_net%v%'vertex.names') %in% (mtfo_net%v%'vertex.names'))
+# required_developers <-(reqc_net%v%'vertex.names')
+# missing_developers <- required_developers[!matches]
+# add.vertices(mtfo_net, nv = length(missing_developers))
+# from <- (length(network.vertex.names(mtfo_net)) - (length(missing_developers))) +1
+# to <- length(network.vertex.names(mtfo_net))
+# network.vertex.names(mtfo_net)[from:to] <- missing_developers
+# network.vertex.names(mtfo_net)
+# reqc_net %v% 'not_in_mfo_net' <- matches
 
-# The basis for most of the networks is a bipartite edgelist. This edgelist is sometimes weighted. 
-# To transfrom the bipartite edgelist into a one mode network with only developers, the following 
-# steps are done:
-# bipartite_to_row_projection is a function (see file functions_developer_sna) that creates a 
-# matrix based on the egelist. This function only works for non-weighted edgelist (frequency
-# edgelist). The output of this function is transformed into a matrix.
-# The matrix is transformed into a network with as.network.
-# Network description are added as needed.
-
-# microtask_file is a 2 mode network (developer - file). Project this to a dev-dev network
-head(microtask_file)
-mt_file <- as.matrix(bipart_to_row_projection(microtask_file$author, microtask_file$Filename)[[2]])
-# nodes = developer
-# edges = number of times developers worked on same file
-
-mtfi_net <- as.network(mt_file, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
-mtfi_net %v% 'vertex.names'
-
-
-# microtask_folder is a 2 mode network (developer - folder). Project this to a dev-dev network
-head(microtask_folder)
-mt_folder <- as.matrix(bipart_to_row_projection(microtask_folder$author, microtask_folder$folder_names)[[2]])
-# nodes = developer
-# edges = number of times  developers worked on files located in the same folder
-mtfo_net <- as.network(mt_folder, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
-gplot(mtfo_net, label=mtfo_net%v%'vertex.names') # fig not for publication
-
-head(microtask_owner)
-mt_owner <- network(microtask_owner, directed=T, matrix.type='e')
-# nodes = developers
-# edges = number of times developers worked on a file owned by someone else
-gplot(mt_owner, label=mt_owner%v%'vertex.names') # this draws the network. Figure is not for publication
-
-# downer is a 2 mode network (developer - folder). 
-head(downer)
-down <- bipart_to_row_projection(downer$new_owner, downer$folder_names)[[2]]
-# Great check. Only self-loops
-# nodes = developer
-# edges = number of times 2 developers own the same folder.  
-
-# make reqcomm into a network. it is already a 1 mode network (dev-dev)
-reqcomm <- as.data.frame(reqcomm)
-reqcomm$V3 <- as.numeric(as.character(reqcomm$V3))
-
-# summarize reqcomm per unique node-node pair.
-library(dplyr)
-reqcomm_grp <- reqcomm %>% group_by(sender_name, receiver_name) %>% summarize(weights = sum(V3))
- 
-reqc_net <- network(reqcomm_grp, directed=T, matrix.type='e', ignore.eval=F, names.eval='weights')
-reqc_net
-reqc_net %v%'vertex.names'
-head(reqc_net %e%'weights')
-# take 'not.modified' node out
-#delete.vertices(reqc_net, which(reqc_net%v%'vertex.names' == 'not.modified'))
-gplot(reqc_net, label=reqc_net%v%'vertex.names', edge.lwd = log(as.vector(reqc_net%e%'weights'))) # fig not for publication
-
-
-# find developers who should be communicating, but are not in mtfo_net.
-# Add these to the network
-matches <- as.vector( (reqc_net%v%'vertex.names') %in% (mtfo_net%v%'vertex.names'))
-required_developers <-(reqc_net%v%'vertex.names')
-missing_developers <- required_developers[!matches]
-add.vertices(mtfo_net, nv = length(missing_developers))
-from <- (length(network.vertex.names(mtfo_net)) - (length(missing_developers))) +1
-to <- length(network.vertex.names(mtfo_net))
-network.vertex.names(mtfo_net)[from:to] <- missing_developers
-network.vertex.names(mtfo_net)
-reqc_net %v% 'not_in_mfo_net' <- matches
-
-# create empty network g ----------------------------------------------
-
-# change format of authoratt from a long into a wide format. In this way, every developer
-# is mentioned once (one row per developer) with a new columns indicating if they are member 
-# in a version
-
-library(tidyr)
-authattw <- spread(unique(authatt[,-1]), value = author, key = ver2)
-
+# # create empty network g ----------------------------------------------
+# 
+# # change format of authoratt from a long into a wide format. In this way, every developer
+# # is mentioned once (one row per developer) with a new columns indicating if they are member 
+# # in a version
+# 
+# library(tidyr)
+# authattw <- spread(unique(authatt), value = author, key = ver)
+# 
 nbr_dev <- length(unique(authatt$author)) # set the size of the network to the
 # number of developers
- 
+
 #Initialize a network object
 g<-network.initialize(nbr_dev)
 
-unique(authatt$author) # check if artifical developer already part of list. 
+unique(authatt$author) # check if artifical developer already part of list.
 # If not, run the next two lines that are commented out.
 # set.vertex.attribute(g, 'vertex.names', c(unique(as.character(authatt$ID_author)), '22'))
 # set.vertex.attribute(g, 'developers', c(unique(as.character(authatt$author)), 'external_owner'))
 
 # add vertex attributes. Run the following two lines only if the external developer is included
-# in the file authatt. If not, run the two lines above that are commented out. 
-set.vertex.attribute(g, 'vertex.names', unique(as.character(authatt$ID_author)))
-set.vertex.attribute(g, 'developers', unique(as.character(authatt$author)))
+# in the file authatt. If not, run the two lines above that are commented out.
+network::set.vertex.attribute(g, 'vertex.names', unique(as.character(authatt$ID_author)))
+network::set.vertex.attribute(g, 'developers', unique(as.character(authatt$author)))
 
 participants <- NULL
 jobtitle <- NULL
 location <- NULL
 contract <- NULL
 
-# in the following loop information for developers who are members of version 2 is stored in a 
+# in the following loop information for developers who are members of version 2 is stored in a
 # number of temporary files (all begnning with tmp_).
-# If a developer is not member of the version the number 99 is added. 
-for (i in get.vertex.attribute(g, 'developers')){
+# If a developer is not member of the version the number 99 is added.
+for (i in network::get.vertex.attribute(g, 'developers')){
   print(i)
-  tmp_ver <- authatt[authatt$author == i, 7]
+  tmp_ver <- authatt[authatt$author == i, 1]
+  
   if(2 %in% tmp_ver){present <- 1}else{present<-0}
   participants <- cbind(participants, present)
-  
+
   if(2 %in% tmp_ver){tmp_job <- authors_mbr_v2[authors_mbr_v2$author == i, 4]}else{tmp_job<- 99}
   jobtitle <- cbind(jobtitle, tmp_job)
-  
+
   if(2 %in% tmp_ver){tmp_loc <- authors_mbr_v2[authors_mbr_v2$author == i, 5]}else{tmp_loc<- 99}
   location <- cbind(location, tmp_loc)
-  
+
   if(2 %in% tmp_ver){tmp_con <- authors_mbr_v2[authors_mbr_v2$author == i, 6]}else{tmp_con<- 99}
   contract <- cbind(contract, tmp_con)
-  
+
 }
-set.vertex.attribute(g, 'ver2', as.numeric(t(participants)[,1]))
-set.vertex.attribute(g, 'jobtitle', as.numeric(t(jobtitle)[,1]))
-set.vertex.attribute(g, 'location', as.numeric(t(location)[,1]))
-set.vertex.attribute(g, 'contract', as.numeric(t(contract)[,1]))
+network::set.vertex.attribute(g, 'ver2', as.numeric(t(participants)[,1]))
+network::set.vertex.attribute(g, 'jobtitle', as.numeric(t(jobtitle)[,1]))
+network::set.vertex.attribute(g, 'location', as.numeric(t(location)[,1]))
+network::set.vertex.attribute(g, 'contract', as.numeric(t(contract)[,1]))
 
 # After running these lines of code you get an empty network g. It is empty because no edges
 # are included. You can check this by typing g (the name of the empty network) in the console.
-# The network g only includes the vertices (the 21 real developers and the 1 artificial one) 
+# The network g only includes the vertices (the 21 real developers and the 1 artificial one)
 # and their attributes. If you like to see the attributes (demographics) about the developers
 # comment out the following line.
-
-g %v% 'location' 
+g %v% 'contract'
+# g %v% 'location'
 # to see other attributes use this command: network_name %v% attribute_name
-# the 'v' between percent signs stands for vertex. Use e for edges. The attribute name needs 
-# to be given as character. 
+# the 'v' between percent signs stands for vertex. Use e for edges. The attribute name needs
+# to be given as character.
 
 
-# copy the empty network and add required communication (technical --------
-
-g_req <- g
-
-# add edge values for required communication
-# step 1: modifiy reqcomm names so that instead of the names it shows the ID numbers
-# the network packages requirs vertex ids to be sequential numbers starting with 1
-reqcomm2 <- reqcomm_grp
-
-# the values in reqcomm2 need to be turned into character vectors and not factors. 
-str(reqcomm2)
-reqcomm2$sender_name <- as.character(reqcomm2$sender_name)
-reqcomm2$receiver_name <- as.character(reqcomm2$receiver_name)
-
-# modify tail/sender
-reqcomm2_snd <- NULL
-for (i in 1:length(reqcomm2$sender_name)){ # could be coded easier
-  tmp_dev <- reqcomm2$sender_name[i]
-  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
-  print(paste("step:", i, "and developer id: ", tmp_id))
-  #reqcomm2$sender_name[i] <- tmp_id
-  reqcomm2_snd <- c(reqcomm2_snd, tmp_id)
-}
-
-# modify head/receiver
-reqcomm2_rcv <- NULL
-for (i in 1:length(reqcomm2$receiver_name)){ # could be coded easier
-  tmp_dev <- reqcomm2$receiver_name[i]
-  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
-  #reqcomm2$receiver_name[i] <- tmp_id
-  reqcomm2_rcv <- c(reqcomm2_rcv, tmp_id)
-}
-
-# aggregate reqcomm so that for each edge and self-loop only 1 row
-#reqcomm2_sum<-aggregate(reqcomm2$weight, by=list(reqcomm2$und_from_file_id, reqcomm2$und_to_file_id), sum)
-
-# add edges
-add.edges(g_req, tail = reqcomm2_snd, head = reqcomm2_rcv, 
-          names.eval = 'req_comm', vals.eval = reqcomm2$weights)
-g_req
-
+# # copy the empty network and add required communication (technical --------
+# 
+# g_req <- g
+# 
+# # add edge values for required communication
+# # step 1: modifiy reqcomm names so that instead of the names it shows the ID numbers
+# # the network packages requirs vertex ids to be sequential numbers starting with 1
+# reqcomm2 <- reqcomm_grp
+# 
+# # the values in reqcomm2 need to be turned into character vectors and not factors. 
+# str(reqcomm2)
+# reqcomm2$sender_name <- as.character(reqcomm2$sender_name)
+# reqcomm2$receiver_name <- as.character(reqcomm2$receiver_name)
+# 
+# # modify tail/sender
+# reqcomm2_snd <- NULL
+# for (i in 1:length(reqcomm2$sender_name)){ # could be coded easier
+#   tmp_dev <- reqcomm2$sender_name[i]
+#   tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+#   print(paste("step:", i, "and developer id: ", tmp_id))
+#   #reqcomm2$sender_name[i] <- tmp_id
+#   reqcomm2_snd <- c(reqcomm2_snd, tmp_id)
+# }
+# 
+# # modify head/receiver
+# reqcomm2_rcv <- NULL
+# for (i in 1:length(reqcomm2$receiver_name)){ # could be coded easier
+#   tmp_dev <- reqcomm2$receiver_name[i]
+#   tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+#   #reqcomm2$receiver_name[i] <- tmp_id
+#   reqcomm2_rcv <- c(reqcomm2_rcv, tmp_id)
+# }
+# 
+# # aggregate reqcomm so that for each edge and self-loop only 1 row
+# #reqcomm2_sum<-aggregate(reqcomm2$weight, by=list(reqcomm2$und_from_file_id, reqcomm2$und_to_file_id), sum)
+# 
+# # add edges
+# add.edges(g_req, tail = reqcomm2_snd, head = reqcomm2_rcv, 
+#           names.eval = 'req_comm', vals.eval = reqcomm2$weights)
+# g_req
+# 
 
 # copy the empty network and add file-coworking information ---------------
 
-g_mt <- g
+# g_mt <- g
+# 
+# # add edges
+# head(microtask_file)
+# 
+# # replace developer name with vertex id
+# for (i in 1:length(microtask_file$author)){ # could be coded easier
+#   tmp_dev <- microtask_file$author[i]
+#   tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+#   microtask_file$author[i] <- tmp_id
+# }
+# 
+# mt_file <- as.matrix(bipart_to_row_projection(microtask_file$author, microtask_file$Filename)[[2]])
+# # modify matrix into an edgelist. maybe via first creating a network
+# mtfi_net <- as.network(mt_file, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
+# # nodes = developer
+# # edges = number of times developers worked on same file
+# mtfi_el <- as.edgelist(mtfi_net, attrname = 'frequency')
+# 
+# network::add.edges(g_mt, mtfi_el[,1], mtfi_el[,2], names.eval = 'freq_collab', vals.eval = mtfi_el[,3])
+# g_mt
 
-# add edges
-head(microtask_file)
 
-# replace developer name with vertex id
-for (i in 1:length(microtask_file$author)){ # could be coded easier
-  tmp_dev <- microtask_file$author[i]
-  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
-  microtask_file$author[i] <- tmp_id
-}
-
-mt_file <- as.matrix(bipart_to_row_projection(microtask_file$author, microtask_file$Filename)[[2]])
-# modify matrix into an edgelist. maybe via first creating a network
-mtfi_net <- as.network(mt_file, directed=F, matrix.type='a', ignore.eval=F, names.eval='frequency')
-# nodes = developer
-# edges = number of times developers worked on same file
-mtfi_el <- as.edgelist(mtfi_net, attrname = 'frequency')
-
-add.edges(g_mt, mtfi_el[,1], mtfi_el[,2], names.eval = 'freq_collab', vals.eval = mtfi_el[,3])
-g_mt
-
-
-# Copy empty g and add edge ownership -------------------------------------
-
-g_own <- g
-
-# add edges
-head(microtask_owner)
-
-# replace developer[author] name with vertex id
-for (i in 1:length(microtask_owner$author)){ # could be coded easier
-  tmp_dev <- microtask_owner$author[i]
-  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
-  microtask_owner$author[i] <- tmp_id
-}
-
-# replace developer[new_owner] name with vertex id
-for (i in 1:length(microtask_owner$new_owner)){ # could be coded easier
-  tmp_dev <- microtask_owner$new_owner[i]
-  tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
-  microtask_owner$new_owner[i] <- tmp_id
-}
-
-# aggregate microtask_owner to have one row per edge
-library(dplyr)
-mt_own_sum <- as.data.frame(microtask_owner %>% group_by(author, new_owner) %>% mutate(weight = n()))
-mt_own_sum <- unique(mt_own_sum)
-
-# modify matrix into an edgelist. maybe via first creating a network
-mtown_net <- network(mt_own_sum, directed=T, matrix.type='e', ignore.eval=F, names.eval='freq_own')
-# nodes = developer
-# edges = number of times developers worked on same file
-mtown_el <- as.edgelist(mtown_net, attrname = 'freq_own')
-
-add.edges(g_own, mtown_el[,1], mtown_el[,2], names.eval = 'freq_own', vals.eval = mtown_el[,3])
-g_own
+# # Copy empty g and add edge ownership -------------------------------------
+# 
+# g_own <- g
+# 
+# # add edges
+# head(microtask_owner)
+# 
+# # replace developer[author] name with vertex id
+# for (i in 1:length(microtask_owner$author)){ # could be coded easier
+#   tmp_dev <- microtask_owner$author[i]
+#   tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+#   microtask_owner$author[i] <- tmp_id
+# }
+# 
+# # replace developer[new_owner] name with vertex id
+# for (i in 1:length(microtask_owner$new_owner)){ # could be coded easier
+#   tmp_dev <- microtask_owner$new_owner[i]
+#   tmp_id <- authors_unique[authors_unique$author == tmp_dev, 3]
+#   microtask_owner$new_owner[i] <- tmp_id
+# }
+# 
+# # aggregate microtask_owner to have one row per edge
+# library(dplyr)
+# mt_own_sum <- as.data.frame(microtask_owner %>% group_by(author, new_owner) %>% mutate(weight = n()))
+# mt_own_sum <- unique(mt_own_sum)
+# 
+# # modify matrix into an edgelist. maybe via first creating a network
+# mtown_net <- network(mt_own_sum, directed=T, matrix.type='e', ignore.eval=F, names.eval='freq_own')
+# # nodes = developer
+# # edges = number of times developers worked on same file
+# mtown_el <- as.edgelist(mtown_net, attrname = 'freq_own')
+# 
+# add.edges(g_own, mtown_el[,1], mtown_el[,2], names.eval = 'freq_own', vals.eval = mtown_el[,3])
+# g_own
 
 
 
@@ -328,7 +402,7 @@ g_own
 
 # Checks before doing Step 1
 domain_own <- DF[,c(45,7)] #new owner - ID-file_und. 
-task4 <- DF2[DF2$file == '1.5',]
+task4 <- DF2[DF2$file == file_number,]
 td <- task4
 
 # when multiplying the ownership matrix w/ the task interdependencies, the columns
@@ -446,7 +520,7 @@ dim(cn)
 # collaboration realized matrix -------------------------------------------
 # create the collaboration required matrix (CR). This is the DV network
 # 
-task_df <- DF[DF$ver == 4,c(1,7)]
+task_df <- DF[DF$ver == working_version,c(1,7)]
 
 # limit task_df to the file id's included in the CN network. We'll be using
 # shared_vertices to subset task-df
@@ -470,21 +544,24 @@ task_df_mat <- as_incidence_matrix(task_df_bip)
 mode(task_df_mat)
 cr <- task_df_mat %*% t(task_df_mat)
 dim(cr)
+dim(cn)
 
-# cr and cn do not have the same dimension. The following developers are not included
+# if cr and cn do not have the same dimension. The following developers are not included
 # in cr
-dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])]
+# dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])]
+# if the previous line is not 0 uncomment (remove the hashtag) the next lines 
 
 # we are going to add them as vertexes into the bipartiate graph created above. 
 # Then we are transforming the bipatite network again into an incidence matrix
-V(task_df_bip)$name 
-V(task_df_bip)$name  <- stringr::str_trim(as.character(V(task_df_bip)$name)) #strip white spaces
-task_df_bip <- add_vertices(task_df_bip, 5, 
-                            name = dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])],
-                            type = FALSE)
+#V(task_df_bip)$name 
+#V(task_df_bip)$name  <- stringr::str_trim(as.character(V(task_df_bip)$name)) #strip white spaces
+#task_df_bip <- add_vertices(task_df_bip, 5, 
+#                            name = dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])],
+#                            type = FALSE)
 task_df_mat <- as_incidence_matrix(task_df_bip)
 dim(task_df_mat)
-detach("package:igraph", unload=TRUE)
+#pkg <- "packate:igraph"
+#detach(pkg, character.only=TRUE)
 mode(task_df_mat)
 cr <- task_df_mat %*% t(task_df_mat)
 dim(cr)
@@ -504,17 +581,17 @@ which(rownames(cr) != row.names(cn))
 # descriptives ------------------------------------------------------------
 
 # Number of develoers in version 4
-length(unique(microtask$author))
+length(unique(microtask_file$author))
 
 # Barplot: Developer activity in version 4
-ggplot(DF[DF$ver==4,], aes(x = author)) + geom_bar() + labs(title="Developer activity in version 4",
+ggplot(DF[DF$ver==working_version,], aes(x = author)) + geom_bar() + labs(title="Developer activity in version 4",
                                                 subtitle ='Number of events developer logged',
                                                 x = 'Developer') + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ggsave('nbr_events_per_develoepr_ver4.png')
 
 # barplot: Owners of folders
-ggplot(DF[DF$ver == 4,], aes(x = new_owner)) + geom_bar() + labs(title="Folder Onwership in version 4", 
+ggplot(DF[DF$ver == working_version,], aes(x = new_owner)) + geom_bar() + labs(title="Folder Onwership in version 4", 
                                                                  subtitle = 'Number of folder a developer owns',
                                                                  x = 'Developer') + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
@@ -554,18 +631,17 @@ igraph::write.graph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), 
 
 # correlation between graphs
 
-cr_cn_corr = qaptest(list(cr,cn), gcor)
 cr_cn_corr <- netcancor(cr, cn, nullhyp = 'qap', reps = 10000)
 summary(cr_cn_corr)
-plot(cr_cn_corr$cdist)
+#plot(cr_cn_corr$cdist)
 
 # simple linear regression (multiple quadratic assignment procedure)
-
-net.mod.1 <- netlm(cr, cn, reps=10000) # takes some time due to the high number of replication
+net.mod.1 <- netlm(cr, cn, reps=10000) # takes some time 
 summary(net.mod.1) 
 
 # check in the summary the coefficient estimate. The result show that needed collaboration 
-# has a negative relation to realized collaboration. The estimate is -0.099 with a p value of 0.06
+# has a negative relation to realized collaboration. The estimate is 0.04 with a p value of 0.06
+
 
 # build statnet networks --------------------------------------------------
 
@@ -597,11 +673,11 @@ g%v%'developers' == cr_net%v%'vertex.names'
 as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))]
 
 # add the extra 4 people
-add.vertices(cr_net, 4)
-add.vertices(cn_net, 4)
-set.vertex.attribute(cr_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))],
+network::add.vertices(cr_net, 4)
+network::add.vertices(cn_net, 4)
+network::set.vertex.attribute(cr_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))],
                      v = 19:22)
-set.vertex.attribute(cn_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cn_net%v%'vertex.names'))],
+network::set.vertex.attribute(cn_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cn_net%v%'vertex.names'))],
                      v = 19:22)
 cr_net%v%'vertex.names'
 cn_net%v%'vertex.names'
@@ -621,9 +697,9 @@ contract <- NULL
 # in the following loop information for developers who are members of version 2 is stored in a 
 # number of temporary files (all begnning with tmp_).
 # If a developer is not member of the version the number 99 is added. 
-for (i in get.vertex.attribute(cr_net, 'vertex.names')){
+for (i in network::get.vertex.attribute(cr_net, 'vertex.names')){
   print(i)
-  tmp_ver <- authatt[authatt$author == i, 7]
+  tmp_ver <- authatt[authatt$author == i, 1]
   if(2 %in% tmp_ver){present <- 1}else{present<-0}
   participants <- cbind(participants, present)
   
@@ -637,10 +713,10 @@ for (i in get.vertex.attribute(cr_net, 'vertex.names')){
   contract <- cbind(contract, tmp_con)
   
 }
-set.vertex.attribute(cr_net, 'ver2', as.numeric(t(participants)[,1]))
-set.vertex.attribute(cr_net, 'jobtitle', as.numeric(t(jobtitle)[,1]))
-set.vertex.attribute(cr_net, 'location', as.numeric(t(location)[,1]))
-set.vertex.attribute(cr_net, 'contract', as.numeric(t(contract)[,1]))
+network::set.vertex.attribute(cr_net, 'ver2', as.numeric(t(participants)[,1]))
+network::set.vertex.attribute(cr_net, 'jobtitle', as.numeric(t(jobtitle)[,1]))
+network::set.vertex.attribute(cr_net, 'location', as.numeric(t(location)[,1]))
+network::set.vertex.attribute(cr_net, 'contract', as.numeric(t(contract)[,1]))
 
 # strength of familiarity is how often two developers worked on a previous version together
 # We will first calculate the affiliation matrix of develoepr - group membership
@@ -742,55 +818,55 @@ summary(m2)
                                     # MCMC.prop.weights='0inflated' # to control for skweded degree distribution
                                     # )
 
-
-# previous notes ----------------------------------------------------------
-
-
-# converged byt lots of NaN (zero standard deviation) for nonzero nodesqrtcovar, transweight
-# atleast, edgeoc req_comm
 # 
-# based on http://mailman13.u.washington.edu/pipermail/statnet_help/2017/002470.html
-# the zero could be because some of the relationships with the effects has 0.
-# This is not detected in valued ergm as a sum could be 0.
-# this could be because no one as values 1st above the mean --> 7 edge values
-# are 1 sd above mean
-# atleast(mean_collab + sd_collab)
-#+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
-
-
-m9.1 <- ergm(g_mt ~ sum# + nonzero()
-           + nodematch('jobtitle')
-           
-           + transitiveweights("min","max","min") 
-           
-           + edgecov(g_own, attrname = 'freq_own', form='sum')
-           + edgecov(g_req, attrname = 'req_comm', form='sum')
-           
-           , response="freq_collab", reference=~Poisson
-           , control = control.ergm(#MCMC.samplesize = 5000,
-             #MCMC.burnin = 50000,
-             #MCMC.interval = 2024,
-             MCMC.prop.weights='0inflated' # to control for skweded degree distribution
-             
-           ))
-mcmc.diagnostics(m9.1)
-# model 9.1 isn't too bad. Some wobblyness in the chains, but that might (!) be eliminated 
-# with opimizing the mcmc parameters
-summary(m9.1)
-
-# explanations
-exp(1.45)
-# developers have a likelihood of 4.26 to work on the same file
-exp(-0.212)
-# if developers have the same job title they are 0.808 less likely to work on the same file
-# developers who have the same job title have a likelihood of 3.45( 4.26 - 0.808) to work on the same file
-exp(-1.22) #transitive weights
-# developers who 
-exp(-.07)
-# developers who work on files owned by someone else, are 0.93 less likely to interact with the owner
+# # previous notes ----------------------------------------------------------
 # 
-# Conway–Maxwell–Poisson ? Fractional moments to take into account over/underdispersion of counts
 # 
+# # converged byt lots of NaN (zero standard deviation) for nonzero nodesqrtcovar, transweight
+# # atleast, edgeoc req_comm
+# # 
+# # based on http://mailman13.u.washington.edu/pipermail/statnet_help/2017/002470.html
+# # the zero could be because some of the relationships with the effects has 0.
+# # This is not detected in valued ergm as a sum could be 0.
+# # this could be because no one as values 1st above the mean --> 7 edge values
+# # are 1 sd above mean
+# # atleast(mean_collab + sd_collab)
+# #+ equalto(max(g_mt%e%'freq_collab', tolerance = sd_collab))
+# 
+# 
+# m9.1 <- ergm(g_mt ~ sum# + nonzero()
+#            + nodematch('jobtitle')
+#            
+#            + transitiveweights("min","max","min") 
+#            
+#            + edgecov(g_own, attrname = 'freq_own', form='sum')
+#            + edgecov(g_req, attrname = 'req_comm', form='sum')
+#            
+#            , response="freq_collab", reference=~Poisson
+#            , control = control.ergm(#MCMC.samplesize = 5000,
+#              #MCMC.burnin = 50000,
+#              #MCMC.interval = 2024,
+#              MCMC.prop.weights='0inflated' # to control for skweded degree distribution
+#              
+#            ))
+# mcmc.diagnostics(m9.1)
+# # model 9.1 isn't too bad. Some wobblyness in the chains, but that might (!) be eliminated 
+# # with opimizing the mcmc parameters
+# summary(m9.1)
+# 
+# # explanations
+# exp(1.45)
+# # developers have a likelihood of 4.26 to work on the same file
+# exp(-0.212)
+# # if developers have the same job title they are 0.808 less likely to work on the same file
+# # developers who have the same job title have a likelihood of 3.45( 4.26 - 0.808) to work on the same file
+# exp(-1.22) #transitive weights
+# # developers who 
+# exp(-.07)
+# # developers who work on files owned by someone else, are 0.93 less likely to interact with the owner
+# # 
+# # Conway–Maxwell–Poisson ? Fractional moments to take into account over/underdispersion of counts
+# # 
 
 
 

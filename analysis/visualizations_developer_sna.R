@@ -5,13 +5,21 @@ library(ggraph)
 
 #better in Gephi for complete data ?
 
-names(DF2)
-g2 <- graph.adjacency(dev_v1, mode="directed", weighted=TRUE)
+# names(DF2)
+# g2 <- graph.adjacency(dev_v1, mode="directed", weighted=TRUE)
+# g2
+# dev_v1 is an object that I created some time ago and deleted. This code has not been updated (bug)
+# you can replace it by any squared matrix you want. Rerun the following lines replacing dev_v1 with
+# the matrix you want to visualize as a graph
+
+# to visualize large graphs, gephi might be the better tool to use. 
+
+g2 <- graph.adjacency(cr, mode="directed", weighted=TRUE)
 g2
 
 ggraph(g2) + # raw depiction. improve for publication
   geom_edge_link(aes(edge_width = weight)) + #width = size arguemtn?
-  geom_node_point()
+  geom_node_point() + labs(title=paste('version', working_version, 'realized communication network', sep=' '))
 
 dev_igraph <- graph.adjacency(developer, weighted=T)
 V(dev_igraph)$location <- authatt$location
@@ -35,7 +43,7 @@ ggraph(dev4g, layout='kk') +
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
   geom_node_label(aes(label = name)) + 
-  theme_graph()
+  theme_graph() 
 #not the nicest. 
 #one arrow with no label
 V(dev4g)$'name'

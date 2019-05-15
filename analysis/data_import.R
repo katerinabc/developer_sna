@@ -53,47 +53,10 @@ version_transformation <- cbind(version_transformation,
                                 ver_author = as.character(c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)))
 version_transformation <- version_transformation[,c(1,3,2)]
 # check if new version numbering is ok, then override all ver values
-#authatt$ver2 <- as.numeric(version_transformation[,3][match(authatt$ver, version_transformation[,2])])
+authatt$ver2 <- as.numeric(version_transformation[,3][match(authatt$ver, version_transformation[,2])])
 authatt$ver <- as.numeric(version_transformation[,3][match(authatt$ver, version_transformation[,2])])
 
 # take care. check structure. lots of variables read as characters
-# # create DV network -------------------------------------------------------
-# 
-# # DF is edgelist (instance list) in the format: author - file 
-# bg <- graph.empty(directed = F)
-# node.out <- unique(DF$author) 
-# node.in <- unique(DF$Filename) 
-# bg <- add.vertices(bg,nv=length(node.out),attr=list(name=node.out),type=rep(FALSE,length(node.out)))
-# bg <- add.vertices(bg,nv=length(node.in),attr=list(name=node.in),type=rep(TRUE,length(node.in)))
-# edge.list.vec <- as.vector(t(as.matrix(data.frame(DF[,c(1:2)]))))
-# bg <- add.edges(bg,edge.list.vec)
-# bg
-# #View(get.incidence(bg))
-# 
-# pr <- bipartite.projection(bg) 
-# 
-# developer <- get.adjacency(pr$proj1,sparse=FALSE,attr="weight")
-# #tasks <- get.adjacency(pr$proj2,sparse=FALSE,attr="weight")
-# 
-# # developer network
-# dev_v1 <- devnetwork(DF, 1)
-# 
-# 
-# # Add attributes to developer network -------------------------------------
-# 
-# #check if name in author att same order as in network file
-# match(rownames(developer), authatt$author) #not a match. sort authatt file
-# match(authatt$author, rownames(developer))
-# authatt <- authatt[match(row.names(developer), authatt$author),]
-# 
-# developer_net <- network(developer, directed=F, matrix.type="a",ignore.eval=FALSE, names.eval="frequency")
-# 
-# developer_net%v%"id" <- authatt$ID_author
-# developer_net%v%"title" <- authatt$jobtitle_raw
-# developer_net%v%"loc" <- authatt$location
-# developer_net%v%"contract" <- authatt$contract
 
-
-# File-by-file ------------------------------------------------------------
 
 

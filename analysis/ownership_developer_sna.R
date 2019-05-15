@@ -141,6 +141,9 @@ ggplot(folder_contribution, aes(value)) + geom_bar() + facet_wrap(~author) +
 ggsave("facet_wrap_developer_contribution_per_folder.png")
 
 
+# create ownership folders ------------------------------------------------
+
+
 # create ownership of folders per version.
 # Ownership is based on contribution to folders
 # ownership can not be re-gained by re-joining the team.
@@ -150,6 +153,10 @@ DF$folder_owner <- as.character(DF$folder_owner)
 authatt$author <- as.character(authatt$author)
 
 # how often has a developer be assigned to a folder, but isn't member in that version
+# row names are developers, first colum (FALSE) means the developer is not a member
+# of a version while being assigned membership. So alberto has been assigned 
+# ownership to 218 folders while not being part of the version team. He has been assigned
+# ownership to 76 folders while being part of the team. 
 table(DF$folder_owner, DF$members)
 
 #top contributor per version per folder
@@ -160,13 +167,17 @@ library(dplyr)
 # how often the author made a contribution to a specific folder in a specific version.
 contr_now <- DF %>% group_by(ver, folder_names, author) %>% summarize(contribution = n())
 # transform the tiddy table into a data frame and keep only the top 1 (highest) contribution
+
+# TODO: error here? ME says folder owner are replaced by those who have highest 
+# contribution across versions and not just for that version.
+
 contr_now <- as.data.frame(contr_now %>%group_by(ver, folder_names) %>% top_n(1, contribution))
 
 # creating an index with row numbers of those developers who are not a member in 
 # version x but author of a folder that has been modified in version x
 idx_nonmembers <- which(DF$members == FALSE)
 
-# copy the folder owner names. These will be overwrittenusing the loop if necessary 
+# copy the folder owner names. These will be overwritten using the loop if necessary 
 DF$new_owner <- DF$folder_owner
  
 # Assigning new folder owners.
@@ -183,12 +194,13 @@ DF$new_owner <- DF$folder_owner
 for (i in idx_nonmembers){
   tmp_version <-DF[i,6]
   tmp_folder <- DF[i, 42]
+  # potentially add here another step by first subsetting per version
   tmp_contributors <- contr_now[contr_now$folder_names == tmp_folder,]
   tmp_folder_contributor <- tmp_contributors[
     tmp_contributors$ver == tmp_version,3][1] # pick first developer when 2 tie in contribution
   
   DF[i,45] <- tmp_folder_contributor
-  #print(i)
+  print(i)
   #print(c(tmp_version, tmp_folder, tmp_contributors, tmp_folder_contributor))
   
 }
@@ -239,27 +251,46 @@ ownership_withid <- ownership_withid[order(ownership_withid$ID_File_und),]
 
 # This might be a bit weird, but I'm going to do mini steps to make sure it workds. 
 # Get a vector of sender and receivers. this vector contains the file ID
-sender_id <- task_v2[,1]
-receiver_id <- task_v2[,2]
+sender_id <- task_v2[,1] # column 1 is und_from_file_id
+receiver_id <- task_v2[,2] # column 2 is und_to_file_id
 
 # replace the file id with the folder owner names.
 sender_name <- ownership_withid$new_owner[match(sender_id, ownership_withid$ID_File_und)]
 receiver_name <- ownership_withid$new_owner[match(receiver_id, ownership_withid$ID_File_und)]
 
+table(is.na(sender_name)) # 12958 instances of NA
+table(is.na(receiver_name)) # 14720 instaces of NA
+
 # the files which don't have a folder owner name (no match) are NA for the moment. 
 # Replace NA with the original file ID number for testing purposes
-snd_na_idx <- which(is.na(sender_name))
-sender_name[snd_na_idx] <- sender_id[snd_na_idx]
+snd_na_idx <- which(is.na(sender_name)) # this returns row numbers
+sender_name[snd_na_idx] <- sender_id[snd_na_idx] # this replaces NA with the original file ID
 
-rcv_na_idx <- which(is.na(receiver_name))
-receiver_name[rcv_na_idx] <- receiver_id[rcv_na_idx]
+rcv_na_idx <- which(is.na(receiver_name)) # this returns row numbers
+receiver_name[rcv_na_idx] <- receiver_id[rcv_na_idx] # this replaces NA with the original file ID
 
+# TODO: check Mahdi's comment replace file IDs with owner from previous version
+# first file with no onwer has the file ID 52. 
+head(ownership_withid)
+ownership_withid %>% filter(ownership_withid$ID_File_und == 52) # no file 52
+# ownership_withid only for version 2?
+# No check line 242. ownership_withid is a subset of DF. DF is the complete dataset. o
+# ownership_withid only contains the columns 7 (ID_File_und) and 45 (new_owner)
+# 
+# 
+# 
 # create the micro task communication edgelist
 reqcomm_v2 <- cbind(sender_name, receiver_name, task_v2$weight)
 View(reqcomm_v2)
 
 # count number of file IDs that have no owner
-length(snd_na_idx) + length(rcv_na_idx) # 27678
+# length(snd_na_idx) + length(rcv_na_idx) # 27678 error here. These are row numbers, not file IDs
+
+re
+
+# proportion of files with no owner
+length(snd_na_idx)/dim(reqcomm_v2)[1] # 0.78
+length(rcv_na_idx)/dim(reqcomm_v2)[1] # 0.89
 
 # files with no assigned folder owner
 no_folder_owner <- c(sender_id[snd_na_idx],receiver_id[rcv_na_idx])
@@ -268,7 +299,8 @@ length(unique(no_folder_owner)) # 2657 files --> need artificial name as this wi
 tail(sort(table(no_folder_owner)))
 # Ideal workflow: find out number of files with no owner. decide if keep file ID as artifical
 # folder owner name or replace with artifical name. 
-ggplot(as.data.frame(no_folder_owner), aes(x = no_folder_owner)) + geom_bar()
+head(no_folder_owner)
+ggplot(as.data.frame(no_folder_owner), aes(x = no_folder_owner)) + geom_bar() + labs(x='folder_id')
 
 # the id's that are not matched do not appear in the dataset DF
 # test assumption with id 43748, 36927, 15330
