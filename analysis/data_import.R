@@ -9,6 +9,9 @@ library(igraph)
 library(ggplot2)
 
 source('functions_developer_sna.R')
+
+# begin with a clean state
+rm(list=ls())
 # data --------------------------------------------------------------------
 
 # load the microtasks
@@ -19,18 +22,23 @@ for (f in myFiles) {
   dat <- read.csv(f, header=T, sep=",", na.strings="", stringsAsFactors = F)
   #filename <- gsub(".csv", '', unlist(strsplit(f,split="_",fixed=T))[3])
   #filename2 <- gsub(".csv", '', filename)
-  dat$file <- gsub(".csv", '', unlist(strsplit(f,split="_",fixed=T))[3])
+  dat$file <- gsub(".csv", '', unlist(strsplit(f,split="_",fixed=T))[3]) # error here???
   DF <- rbind(DF, dat)
 }
 
 # correct the version numbers
-version_transformation <- cbind(ori = as.character(c('1.4', '1.4build1', '1.4build3', '1.5', '1.5.2', '1.5.3', "1.5.4", "1.5.5", "2.0.0" , "2.0.1", "2.0.2", "2.0.3", "2.1.0")),
-                                      new = as.character(c(1,   1,               1,     2,    3,       4, 5     , 6,     7,     8,     9,    10 , 11)))
+version_transformation <- cbind(ori = as.character(c(     '1.4', '1.4build1', '1.4build3', '1.5', '1.5.2', '1.5.3', "1.5.4", "1.5.5", "2.0.0" , "2.0.1", "2.0.2", "2.0.3", "2.1.0")),
+                                      new = as.character(c(1,        1,               1,     2,    3,       4,          5     , 6,      7,         8,       9,       10 ,    11)))
 
 DF$ver <- version_transformation[,2][match(DF$file, version_transformation[,1])]
 
 # take out files with no ID number. Error with Understand
 DF <- DF[-which(is.na(DF$ID_File_und)),]
+
+# take out all files with id_rev smaller than and equal to 7496
+table(DF$ID_rev < 7497)
+DF <- DF[-which(DF$ID_rev < 7497),]
+ 
 
 #load the task dependencies
 myFiles2 = list.files(path="~/Documents/gitrepo/developer_sna/data/file-by-file", 
