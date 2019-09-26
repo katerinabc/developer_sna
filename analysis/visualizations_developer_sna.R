@@ -14,12 +14,15 @@ library(ggraph)
 
 # to visualize large graphs, gephi might be the better tool to use. 
 
-g2 <- graph.adjacency(cr, mode="directed", weighted=TRUE)
+g2 <- graph.adjacency(g, mode="directed", weighted=TRUE)
 g2
 
 ggraph(g2) + # raw depiction. improve for publication
   geom_edge_link(aes(edge_width = weight)) + #width = size arguemtn?
-  geom_node_point() + labs(title=paste('version', working_version, 'realized communication network', sep=' '))
+  geom_node_point() + 
+  geom_node_label(aes(label= name)) + 
+  theme_graph() + 
+  labs(title=paste('version', working_version, 'realized communication network', sep=' '))
 
 dev_igraph <- graph.adjacency(developer, weighted=T)
 V(dev_igraph)$location <- authatt$location

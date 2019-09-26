@@ -87,8 +87,6 @@ library(statnet)
 # two people are interacting the level of interaction is pretty high. control for this by
 # adding the term nonzero()
 
-# Edgecov
-
 
 # data --------------------------------------------------------------------
 
@@ -120,7 +118,7 @@ reqcomm <- reqcomm_v2 # edgelist: FO sender file, FO receiver file, weight depen
 
 # complete developer information dataset
 authatt$author<-as.character(authatt$author)
-authatt<- rbind(authatt, c(4, "external_owner", 22, 99, 99, 99)) # add a row of entries for artificial developer
+authatt<- rbind(authatt, c(working_version, "external_owner", 22, 99, 99, 99)) # add a row of entries for artificial developer
 authors_v2 <- authatt[,c(2,1)]
 authors_v2$v2 <- authatt$ver == working_version # add logical vector for membership
 authatt$v2 <- authatt$ver == working_version
@@ -218,7 +216,8 @@ nbr_dev <- length(unique(authatt$author)) # set the size of the network to the
 #Initialize a network object
 g<-network.initialize(nbr_dev)
 
-unique(authatt$author) # check if artifical developer already part of list.
+unique(authatt$author) # check if artifical developer already part of list. In the list this is 
+# called external_owner
 # If not, run the next two lines that are commented out.
 # set.vertex.attribute(g, 'vertex.names', c(unique(as.character(authatt$ID_author)), '22'))
 # set.vertex.attribute(g, 'developers', c(unique(as.character(authatt$author)), 'external_owner'))
@@ -401,9 +400,31 @@ g %v% 'contract'
 # step 2: multiply MxN matrix from step 1 with NxM matrix 
 
 # Checks before doing Step 1
-domain_own <- DF[,c(45,7)] #new owner - ID-file_und. 
-task4 <- DF2[DF2$file == file_number,]
-td <- task4
+domain_own <- DF[,c(45,7)] #new owner - ID-file_und.
+# add to domain_own the file IDs from external owner. Information about which file IDs do not
+# have a folder owner are stored in the object no_folder_owner created in the script
+# ownership_develoepr_sna.R
+
+head(no_folder_owner)
+no_folder_owner <- data.frame(new_owner = 'external_owner', ID_File_und = no_folder_owner)
+domain_own_master <- domain_own # just in case I mess it up
+domain_own <- rbind(domain_own, no_folder_owner)
+
+
+#task4 <- DF2[DF2$file == file_number,]
+#
+# 15/05/2019: 
+# Solution 1: keep all the same (meaning td <- DF2[DF2$file == file_number,]) and use
+# ownership_withid at the end to turn vertices into people. 
+# I made have to add to domain_own all the ID_file_und external_owners have
+# 
+# solution 2: change td <- DF2[DF2$file == file_number,] into td <- reqcomm
+# to use author names instead of file_ids. keep the numbers for those with no 
+# external user. I don' think this will work due to the matrix multiplication
+td <- DF2[DF2$file == file_number,] # this is the same as reqcomm just with ids and not 
+
+#owner names. 
+#td <- reqcomm
 
 # when multiplying the ownership matrix w/ the task interdependencies, the columns
 # (files) in the ownership matrix need to be in the same order than the files in the
@@ -448,8 +469,10 @@ dim(td)
 #td_sm <- el2sm(as.matrix(td[,-4])) # this works, but takes long and makes 
 # my laptop crash
 
+# td_net is the task dependencies based on file ID. this is a 1 mode network.
 td_net <- network(td[,1:2],matrix.type="edgelist",directed=TRUE) 
 
+# domain_own_net is a 2 mode network based on folder owner and file it
 # the next line is nonesense because domain_own is a 2 mode network. The goal of these
 # next lines is to reduce td_net a list of vertex that are present in both files. 
 domain_own_net <- network(domain_own, directed = F, matrix.type = 'edgelist')
@@ -471,7 +494,7 @@ domain_own_net
 library(stringr)
 domain_own_net%v%'vertex.names' <- str_trim(as.character(domain_own_net%v%'vertex.names'))
 # domain_own is the basis against which to match the other network
-# shared_vertices provides the index of nodes in td_net to keep.
+# shared_vertices provides the nodes in td_net to keep.
 shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character(domain_own_net%v%'vertex.names'))
 
 # delete.vertices(network, vertex IDs) deletes the vertices in the network. The vertex
@@ -481,29 +504,55 @@ shared_vertices <- which(as.character(td_net%v%'vertex.names') %in% as.character
 # After further thinking, another approach is to induce a subgroup 
 # (get.induceedSubgraph). That seems to be easier/more logical. 
 
-td_net_sub <- get.inducedSubgraph(td_net, v = shared_vertices)
+# get.inducedSubgraph requires vertex IDs. shared_vertices contains the file Ids that are part of 
+# both networks. We need to turn the shared_vertices into vertex ids
+
+shared_vertices_idx <- match(as.character(td_net%v%'vertex.names'), as.character(domain_own_net%v%'vertex.names'))
+head(shared_vertices_idx)
+length(shared_vertices_idx)
+shared_vertices_idx <- shared_vertices_idx[-which(is.na(shared_vertices_idx))] # remove NA
+length(shared_vertices_idx)
+td_net%v%'vertex.names'
+td_net_sub <- get.inducedSubgraph(td_net, v = shared_vertices_idx)
 td_mat <- as.sociomatrix(td_net_sub)
 
-idx <- which(domain_own$ID_File_und %in% as.character(td_net_sub%v%'vertex.names'))
-test <- domain_own[idx,]
+# shared_vertices_names <-match(as.character(domain_own_net%v%'vertex.names') %in% as.character(td_net%v%'vertex.names'))
+# shared_vertices_idx2 <- which(as.character(domain_own_net%v%'vertex.names') %in% as.character(td_net%v%'vertex.names'))
+# length(shared_vertices_names)
+# shared_vertices_names <- as.character(domain_own_net%v%'vertex.names')[shared_vertices_idx2]
+# domain_own_sub <- get.inducedSubgraph(domain_own_net, v = shared_vertices_names) # this is empty
+# domain_own_sub
 
 library(igraph) # detach afterwards
-domain_own_bip <- graph.data.frame(domain_own, directed = F)
-V(domain_own_bip)$type <- V(domain_own_bip)$name %in% domain_own[,2] #the second column of edges is TRUE type
+domain_own_grp <- domain_own %>% group_by(domain_own$new_owner, domain_own$ID_File_und) %>% count()
+
+domain_own_bip <- graph.data.frame(domain_own_grp, directed = F)
+V(domain_own_bip)$type <- V(domain_own_bip)$name %in% domain_own[,2]
+# the previous line turns the graph into a bipartite network by differentating between 
+# developers (type = FALSE) and file ids (type =True)
+#
 domain_own_bip
+table(V(domain_own_bip)$type)
 
-idx <- which(as.character(td_net%v%'vertex.names') %in% as.character(V(domain_own_bip)$name))
-# 5761 true's
+idx <- match(as.character(td_net%v%'vertex.names'), as.character(V(domain_own_bip)$name))
+length(idx)
+table(is.na(idx)) #check for unmatched IDs
+idx <- idx[-which(is.na(idx))]
+length(idx)
+# 8418 trues. same length as shared_vertices
 
-# add to the index the position of developers. We want to keep them.
-vertex_idx <-which(V(domain_own_bip)$name %in% c(as.character(V(domain_own_bip)$name)[1:18], idx))
+# add to the index the position of developers. We want to keep them all. These are in position 1 until 18
+idx2 <- 1:19
+
+vertex_idx <- c(idx, idx2)
 
 # subset to keep only those vertices of type TRUE also present in td_net
-domain_own_sub <- induced_subgraph(domain_own_bip, vertex_idx, 'auto')
-# length is 5779. This includes the 18 developers. Without them it is 5761 file IDs
-# 
+domain_own_sub <- induced.subgraph(domain_own_bip, vids=vertex_idx, 'auto')
+domain_own_sub
+ 
 # Transform bipartite network into affiliation matrix
-domain_own_mat <- as_incidence_matrix(domain_own_sub)
+domain_own_mat <- as_incidence_matrix(domain_own_sub) #2 mode network with owner and file id
+
 
 # Now we have the two matrices: 
 # Ownership (dataset: domain_own_mat) and task interdependencies (td_mat)
@@ -516,23 +565,33 @@ dim(td_mat)
 cn <-  (domain_own_mat %*% td_mat) %*% t(domain_own_mat)
 dim(cn)
 
+library(ggraph)
+g2 <- graph.adjacency(cn, mode="undirected", weighted=TRUE)
+g2
+p1 <- ggraph(g2, layout='kk') + 
+  geom_edge_link(aes(color = weight)) + 
+  geom_node_point() + 
+  geom_node_label(aes(label= name)) + 
+  theme_graph() + 
+  labs(title=paste('version', working_version, 'needed communication network', sep=' '))
+#ggsave('needed_comm_network.pdf', width = 20, height = 20, units = 'cm')
+
 
 # collaboration realized matrix -------------------------------------------
 # create the collaboration required matrix (CR). This is the DV network
 # 
-task_df <- DF[DF$ver == working_version,c(1,7)]
+#task_df <- DF[DF$ver == working_version,c(1,7)]
 
 # limit task_df to the file id's included in the CN network. We'll be using
 # shared_vertices to subset task-df
 
 task_df <- as.matrix(domain_own[domain_own$ID_File_und %in% shared_vertices,])
 dim(task_df)
-class(task_df) # making sure that the object is a matrix
-mode(task_df) # making sure that the object is iin numeric mode. Not the case
-# right now. task_df is in character mode. Further test this.
-table(sapply(task_df, class))
-# which makes sense because it is an edgelist....
-# convert edgelist into matrix. I'm using the same code as above.
+# class(task_df) # making sure that the object is a matrix
+# mode(task_df) # making sure that the object is in numeric mode. Not the case
+# # right now. task_df is in character mode. Further test this.
+# table(sapply(task_df, class))
+# # convert edgelist into matrix. I'm using the same code as above.
 
 library(igraph)
 task_df_bip <- graph.data.frame(task_df, directed = F)
@@ -547,24 +606,28 @@ dim(cr)
 dim(cn)
 
 # if cr and cn do not have the same dimension. The following developers are not included
-# in cr
-# dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])]
+# in cn
+dimnames(cr)[[1]][which(!dimnames(cr)[[1]] %in% dimnames(cn)[[1]])]
 # if the previous line is not 0 uncomment (remove the hashtag) the next lines 
 
 # we are going to add them as vertexes into the bipartiate graph created above. 
 # Then we are transforming the bipatite network again into an incidence matrix
-#V(task_df_bip)$name 
-#V(task_df_bip)$name  <- stringr::str_trim(as.character(V(task_df_bip)$name)) #strip white spaces
-#task_df_bip <- add_vertices(task_df_bip, 5, 
-#                            name = dimnames(cn)[[1]][which(!dimnames(cn)[[1]] %in% dimnames(cr)[[1]])],
-#                            type = FALSE)
-task_df_mat <- as_incidence_matrix(task_df_bip)
-dim(task_df_mat)
-#pkg <- "packate:igraph"
-#detach(pkg, character.only=TRUE)
-mode(task_df_mat)
-cr <- task_df_mat %*% t(task_df_mat)
-dim(cr)
+# V(task_df_bip)$name 
+# V(task_df_bip)$name  <- stringr::str_trim(as.character(V(task_df_bip)$name)) #strip white spaces
+# missing_person <- dimnames(cr)[[1]][which(!dimnames(cr)[[1]] %in% dimnames(cn)[[1]])]
+# task_df_bip <- add_vertices(task_df_bip, length(missing_person), 
+#                             name = missing_person,
+#                             type = FALSE)
+# task_df_mat <- as_incidence_matrix(task_df_bip)
+# dim(task_df_mat)
+# #pkg <- "packate:igraph"
+# #detach(pkg, character.only=TRUE)
+# mode(task_df_mat)
+# cr <- task_df_mat %*% t(task_df_mat)
+# dim(cr)
+
+
+
 
 # Ok, we got cr and cn. For ERGM we need to make sure that the rownames in both 
 # matrices match.
@@ -610,7 +673,7 @@ ggsave('needed.collab.png')
 
 # network: Needed collaboration
 library(ggraph)
-ggraph(igraph::graph.adjacency(cn, mode='directed', weighted=T), layout='lgl') + 
+p<- ggraph(igraph::graph.adjacency(cn, mode='directed', weighted=T), layout='lgl') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
@@ -619,7 +682,7 @@ ggraph(igraph::graph.adjacency(cn, mode='directed', weighted=T), layout='lgl') +
 igraph::write.graph(igraph::graph.adjacency(cn, mode='directed', weighted=T), 'needed.collab.graphml')
 
 # network: Required collaboration
-ggraph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), layout='auto') + 
+p<- ggraph(igraph::graph.adjacency(cr, mode='undirected', weighted=T), layout='auto') + 
   geom_edge_link(aes(start_cap = label_rect(node1.name),
                      end_cap = label_rect(node2.name)), 
                  arrow = arrow(length = unit(4, 'mm'))) + 
@@ -647,7 +710,7 @@ summary(net.mod.1)
 
 # To run ERGM the graphs need to be loaded as network objects from the statnet package
 
-cr_net <- network (cr, directed=FALSE, ignore.eval=F, names.eval='weights')
+cr_net <- network(cr, directed=FALSE, ignore.eval=F, names.eval='weights')
 cr_net
 cr_net%e%'weights'
 
@@ -670,20 +733,24 @@ g%v%'developers' == cr_net%v%'vertex.names'
 # First add missing people
 
 # check who is missing 
-as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))]
+missing_cr <- as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))]
+missing_cn <- as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cn_net%v%'vertex.names'))]
 
 # add the extra 4 people
-network::add.vertices(cr_net, 4)
-network::add.vertices(cn_net, 4)
+network::add.vertices(cr_net, length(missing_cr))
+network::add.vertices(cn_net, length(missing_cn))
+
+cr_na <- which(is.na(cr_net %v% 'vertex.names'))
+cn_na <- which(is.na(cn_net %v% 'vertex.names'))
+
 network::set.vertex.attribute(cr_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cr_net%v%'vertex.names'))],
-                     v = 19:22)
+                     v = cr_na)
 network::set.vertex.attribute(cn_net, 'vertex.names', value = as.character(g%v%'developers')[which(!as.character(g%v%'developers') %in% as.character(cn_net%v%'vertex.names'))],
-                     v = 19:22)
+                     v = cn_na)
 cr_net%v%'vertex.names'
 cn_net%v%'vertex.names'
 
-
-# order the matrices
+# order the matrices according to g
 cr = cr[match(row.names(g),row.names(cr)), match(colnames(g),colnames(cr))]
 cn = cn[match(row.names(g),row.names(cn)), match(colnames(g),colnames(cn))]
 
@@ -747,8 +814,16 @@ famdev <- ggraph(igraph::graph.adjacency(as.matrix(fam_dev), mode='undirected', 
                  arrow = arrow(length = unit(2, 'mm')),
                  show.legend=T) + 
   geom_node_label(aes(label = name)) + 
-  theme_graph()
-ggsave('fam_developers.png', famdev)
+  theme_graph() + labs(title='familiarity between develoeprs')
+ggsave('fam_developers.png', famdev, width=20, height=20, unit='cm')
+
+
+# take out external owner
+cn_master <- cn_net # backup
+cn_net <- get.inducedSubgraph(cn_net, v =which(!cn_net %v% 'vertex.names' == 'external_owner') )
+
+cr_master <- cr_net # backup
+cr_net <- get.inducedSubgraph(cr_net, v =which(!cr_net %v% 'vertex.names' == 'external_owner') )
 
 
 # valued ergm - basic model -----------------------------------------------
@@ -758,50 +833,50 @@ ggsave('fam_developers.png', famdev)
 # 
 # independent variables = required communication based on file dependencies
 
-base <- ergm(cr_net ~ sum, response="weights", reference=~Geometric)
-
-
-# valued ergo - model building --------------------------------------------
-
-ggplot(as.data.frame(cr_net%e%'weights'), aes(x =cr_net %e% "weights")) + geom_bar() + 
-  labs(title="Distribution of Collaboration values", x = 'Frequency of Collaboration', y = 'Count')
-
-ggplot(as.data.frame(cn_net %e% "weights"), aes(x =cn_net %e% "weights")) + 
-  geom_bar() + 
-  labs(title="Distribution of needed communication values", 
-       x = 'Frequency of Needed Communication', 
-       y = 'Count')
-hist(g_req %e% "req_comm")
-
-m1a <- ergm(cr_net ~ sum + nonzero()
-           + edgecov(cn_net, attrname = 'weights', form='sum')
-           , response="weights", reference=~Geometric)
-mcmc.diagnostics(m1a) # look at the generated plots. For the left side you want to see kinda straight
-# lines, no upward or downward trend. For the right ones you want to see normal curves.
-# If you dont' get that, you can't trust the results. The MCMC simulation isn't stable. 
-summary(m1a)
-
-m1b <- ergm(cr_net ~ sum + nonzero()
-+ edgecov(fam_dev_net, attrname = 'weights', form='sum')
-, response="weights", reference=~Geometric)
-mcmc.diagnostics(m1b)
-summary(m1b)
-
-m2 <- ergm(cr_net ~ sum + nonzero()
-              #+ edgecov(fam_dev_net, attrname = 'weights', form='sum')
-              + edgecov(cn_net, attrname = 'weights', form = 'sum')
-              # attributes 
-              + nodematch('jobtitle')
-              #+ nodematch('location') 
-              #+ nodematch('contract')
-              #+ nodefactor('jobtitle')
-              #+ nodesqrtcovar(center=T) # individual tendency to work
-              # + transitiveweights("min","max","min") 
-              # + cyclicalweights("min","max","min")
-              
-              , response="weights", reference=~Geometric)
-mcmc.diagnostics(m2)
-summary(m2)
+# base <- ergm(cr_net ~ sum, response="weights", reference=~Geometric)
+# 
+# 
+# # valued ergo - model building --------------------------------------------
+# 
+# ggplot(as.data.frame(cr_net%e%'weights'), aes(x =cr_net %e% "weights")) + geom_bar() + 
+#   labs(title="Distribution of Collaboration values", x = 'Frequency of Collaboration', y = 'Count')
+# 
+# ggplot(as.data.frame(cn_net %e% "weights"), aes(x =cn_net %e% "weights")) + 
+#   geom_bar() + 
+#   labs(title="Distribution of needed communication values", 
+#        x = 'Frequency of Needed Communication', 
+#        y = 'Count')
+# hist(g_req %e% "req_comm")
+# 
+# m1a <- ergm(cr_net ~ sum + nonzero()
+#            + edgecov(cn_net, attrname = 'weights', form='sum')
+#            , response="weights", reference=~Geometric)
+# mcmc.diagnostics(m1a) # look at the generated plots. For the left side you want to see kinda straight
+# # lines, no upward or downward trend. For the right ones you want to see normal curves.
+# # If you dont' get that, you can't trust the results. The MCMC simulation isn't stable. 
+# summary(m1a)
+# 
+# m1b <- ergm(cr_net ~ sum + nonzero()
+# + edgecov(fam_dev_net, attrname = 'weights', form='sum')
+# , response="weights", reference=~Geometric)
+# mcmc.diagnostics(m1b)
+# summary(m1b)
+# 
+# m2 <- ergm(cr_net ~ sum + nonzero()
+#               #+ edgecov(fam_dev_net, attrname = 'weights', form='sum')
+#               + edgecov(cn_net, attrname = 'weights', form = 'sum')
+#               # attributes 
+#               + nodematch('jobtitle')
+#               #+ nodematch('location') 
+#               #+ nodematch('contract')
+#               #+ nodefactor('jobtitle')
+#               #+ nodesqrtcovar(center=T) # individual tendency to work
+#               # + transitiveweights("min","max","min") 
+#               # + cyclicalweights("min","max","min")
+#               
+#               , response="weights", reference=~Geometric)
+# mcmc.diagnostics(m2)
+# summary(m2)
 
 # other terms to include:
 # homophily hypothesis
