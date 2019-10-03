@@ -1,5 +1,7 @@
 # create technical interface
-# 
+#  this was previously called required communication. 
+#  A communication is required if file A has a technical dependency in file B.
+#  If file A is modified, file B needs to be adapted. 
 # 
 # clean your workspace first 
 rm(list=ls())
@@ -32,9 +34,11 @@ df <- read_csv('df_modified.csv')
 td <- DF2 # created in data_import.R
 
 
-# tech interface matrix per version ---------------------------------------
 
-wrk_ver <- 2 # this is a place holder to save on writing. This indicates what version 
+# step 1: indicarte active and non active ties ----------------------------------------------
+
+
+#wrk_ver <- 2 # this is a place holder to save on writing. This indicates what version 
 # you are working on
 
 # subset DF per version
@@ -55,8 +59,64 @@ for (i in 1:nrow(td)){
   if(tmp_td_sender %in% df$ID_rev){tmp_active_snd <- 1}else{tmp_active_snd <-0}
   if(tmp_td_receiver %in% df$ID_rev){tmp_active_rc <- 1}else{tmp_active_rc <-0}
   
-  active_snd <- tmp_td_sender
-  active_rc <- tmp_td_receiver
+  active_snd <- c(active_snd, tmp_active_snd)
+  active_rc <- c(active_rc, tmp_active_rc)
 }
+save.image(active_snd, 'active_snd.Rdata')
+save.image(active_rc, 'active_rc.Rdata')
+# add active_snd and active_rc to td
 
+td <- cbind(td, active_snd, active_rc)
+td$active_raw <- td$active_snd + td$active_rc # a tie is active if the snd or rc file is modified during that version 
+table(td$active_raw)
+names(td)
+td$active <- td$active_raw
+td[td$active_raw == 2, which(names(td) == 'active')] <- 1 # transform the 2 into 1. 2 
+table(td$active)
+
+# step 2: create network of required commnication per version -----------------------------------------------------------------
+
+# as the network should be created per version and per time period (e.g., week), this could be a list of networks
+# Potential problem: list of networks too big? 
+# The nodes of on-active ties need to be present.
 # 
+# 3/10/19: code copied from version4_mirroring
+
+# td_net is the task dependencies based on file ID. this is a 1 mode network.
+# this creates one huge network using all of the task interdepencies (the complete file*file)
+# the following edge data is being added:
+# weight: the strenght of the technical dependency
+# version: the version number in which two files were dependent on each other
+# if the tie is active or not
+td_net <- network(td[,c(1:3, 5, 9)],matrix.type="edgelist",directed=TRUE, 
+                  ignore.eval=FALSE) 
+
+td_net
+# step 3:Get network per version ------------------------------------------
+
+table(td_net%e%'ver') # if you run this line you see the number of edges per version
+
+# to subset td_net you need to indicate the edge ids you want to focus on
+# You don't need to know the edge ids (eids), but can include a command to filter edges
+# based on edge attribute.
+# to filer by edgge attribute you type in network_name%e%'edge attribute' == 'filter valued'
+# the 'e' between percentage signs tells R to look for edges. To look at verticees (nodes)
+# you would type %v%.
+# The edge (or node) attributes follows the second per centage sign. This is always in 
+# apostrophes. 
+# Then you tell R what this attribute should be equal to (==), greater (>) or smaller (<) etc.
+
+td_net1 <- get.inducedSubgraph(td_net,eid=which(td_net%e%'ver'==1))
+td_net1
+
+# there is no sense in drawing this network in R. it has 5720 active edges. 
+# Drawing would be better in Gephi
+
+# subsetting td_net can take some time. You can save the resulting object so that next time 
+# you don't have to subset it again, but just need to load the RData object.
+save.image('td_netVer1.RData')
+
+
+# create the network communication required -------------------------------
+# the required communication network is the td_net network. 
+# No further modification is necessary. 
