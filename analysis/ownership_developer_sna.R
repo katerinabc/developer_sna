@@ -370,107 +370,109 @@ ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() 
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ggsave('ownership_change.png')
 
+write_csv(DF, "df_modified.csv" )
 
+# go to file 'tech interface' to create the networks
 
-# Create network of required coordination ---------------------------------
-
-
-# file-by-file are the technical dependencies between software files. THese are stored in
-# DF2 for the complete software (all versions)
-# task_v2 show the technical dependencies for version 4
-# the id's in task 4 correspond to the IDs in 'ID_File_und' in DF and IDs in data set
-# 'files_xx'
-# earlier information: IDs are unique per version. 
-
-# goal: in task_v2 replace the file_id with the owner's name
+# # Create network of required coordination ---------------------------------
 # 
-#file 1.5 is version 2 according to the new version coding 
-# schema - Mahdi 7/9/18
-task_v2 <- DF2[DF2$file == "1.5",] 
-
-# this is the lookup table, containing the ID (col 7) and the folder owner name (col 45)
-ownership_withid <- DF[, c(7, 45)] 
-ownership_withid <- ownership_withid[order(ownership_withid$ID_File_und),]
- 
-# match the IDs in reqcomm_v2 with the IDs in the lookup table ownership_withid. 
-# match returns a numerical vector. The number indicates the position (row number)
-# when the first match happened. In other words it checks in which row an ID mentioned 
-# in reqcomm_v2 appears in ownership_withid$ID_FILE_und. This row number is used to 
-# assign the correct owner from the vector ownership_withinid$new_owner
-
-# This might be a bit weird, but I'm going to do mini steps to make sure it workds. 
-# Get a vector of sender and receivers. this vector contains the file ID
-sender_id <- task_v2[,1] # column 1 is und_from_file_id
-receiver_id <- task_v2[,2] # column 2 is und_to_file_id
-
-write.csv(data.frame(sender_id = sender_id, receiver_id = receiver_id), 'sender_receiver_id_ver4.csv')
-# replace the file id with the folder owner names.
-sender_name <- ownership_withid$new_owner[match(sender_id, ownership_withid$ID_File_und)]
-receiver_name <- ownership_withid$new_owner[match(receiver_id, ownership_withid$ID_File_und)]
-write.csv(data.frame(sender_id = sender_name, receiver_name = receiver_id), 'sender_receiver_name_ver4.csv')
-
-table(is.na(sender_name)) # 12958 instances of NA
-table(is.na(receiver_name)) # 14720 instaces of NA
-
-# the files which don't have a folder owner name (no match) are NA for the moment. 
-# Replace NA with the original file ID number for testing purposes
-snd_na_idx <- which(is.na(sender_name)) # this returns row numbers
-sender_name[snd_na_idx] <- sender_id[snd_na_idx] # this replaces NA with the original file ID
-
-rcv_na_idx <- which(is.na(receiver_name)) # this returns row numbers
-receiver_name[rcv_na_idx] <- receiver_id[rcv_na_idx] # this replaces NA with the original file ID
-
-write.csv(data.frame(sender_id = sender_name, receiver_name = receiver_id), 'sender_receiver_name2_ver4.csv')
-
-# TODO: check Mahdi's comment replace file IDs with owner from previous version
-# first file with no onwer has the file ID 52. 
-head(ownership_withid)
-ownership_withid %>% filter(ownership_withid$ID_File_und == 52) # no file 52
-# ownership_withid only for version 2?
-# No check line 242. ownership_withid is a subset of DF. DF is the complete dataset. o
-# ownership_withid only contains the columns 7 (ID_File_und) and 45 (new owners)
 # 
-# create the micro task communication edgelist
-reqcomm_v2 <- cbind(sender_name, receiver_name, task_v2$weight)
-View(reqcomm_v2)
-
-# count number of file IDs that have no owner
-# length(snd_na_idx) + length(rcv_na_idx) # 27678 error here. These are row numbers, not file IDs
-
-# proportion of files with no owner
-length(snd_na_idx)/dim(reqcomm_v2)[1] # 0.78
-length(rcv_na_idx)/dim(reqcomm_v2)[1] # 0.89
-
-# files with no assigned folder owner
-no_folder_owner <- c(sender_id[snd_na_idx],receiver_id[rcv_na_idx])
-length(unique(no_folder_owner)) # 2657 files --> need artificial name as this will be a big network
-
-length(unique(DF$ID_File_und)) # number of unique file IDs in microtask DF file
-length(unique(c(DF2$und_from_file_id, DF2$und_to_file_id))) # number of unique file IDs in task dependency file
-
-length(unique(c(sender_id[snd_na_idx],receiver_id[rcv_na_idx])))/length(unique(c(DF2$und_from_file_id, DF2$und_to_file_id)))
-# 0.06 files in task dependencies are not matched. 
-
-tail(sort(table(no_folder_owner)))
-# Ideal workflow: find out number of files with no owner. decide if keep file ID as artifical
-# folder owner name or replace with artifical name. 
-head(no_folder_owner)
-ggplot(as.data.frame(no_folder_owner), aes(x = no_folder_owner)) + geom_bar() + labs(x='folder_id')
-
-# the id's that are not matched do not appear in the dataset DF
-# test assumption with id 43748, 36927, 15330
-DF[DF$ID_File_und == 15330, c(1:4, 41, 45)]
-DF[DF$ID_File_und == 43748, c(1:4, 41, 45)]
-DF[DF$ID_File_und == 36927, c(1:4, 41, 45)]
-
-# turn the id's for which no owner was identified into 'external_owner'
-reqcomm_v2[snd_na_idx,1] <- 'external_owner'
-reqcomm_v2[rcv_na_idx,2] <- 'external_owner'
-
-reqcomm_v2 <- as.data.frame(reqcomm_v2) # transform dataset from matrix into data frame
-names(reqcomm_v2)[3] <- 'weights' # assign weights to ownership dependencies
-
-# remove all temporrary files
-rm(list=ls()[grep('tmp', ls())])
-
-save.image("~/Documents/gitrepo/developer_sna/analysis/clean_data.RData")
+# # file-by-file are the technical dependencies between software files. THese are stored in
+# # DF2 for the complete software (all versions)
+# # task_v2 show the technical dependencies for version 4
+# # the id's in task 4 correspond to the IDs in 'ID_File_und' in DF and IDs in data set
+# # 'files_xx'
+# # earlier information: IDs are unique per version. 
+# 
+# # goal: in task_v2 replace the file_id with the owner's name
+# # 
+# #file 1.5 is version 2 according to the new version coding 
+# # schema - Mahdi 7/9/18
+# task_v2 <- DF2[DF2$file == "1.5",] 
+# 
+# # this is the lookup table, containing the ID (col 7) and the folder owner name (col 45)
+# ownership_withid <- DF[, c(7, 45)] 
+# ownership_withid <- ownership_withid[order(ownership_withid$ID_File_und),]
+#  
+# # match the IDs in reqcomm_v2 with the IDs in the lookup table ownership_withid. 
+# # match returns a numerical vector. The number indicates the position (row number)
+# # when the first match happened. In other words it checks in which row an ID mentioned 
+# # in reqcomm_v2 appears in ownership_withid$ID_FILE_und. This row number is used to 
+# # assign the correct owner from the vector ownership_withinid$new_owner
+# 
+# # This might be a bit weird, but I'm going to do mini steps to make sure it workds. 
+# # Get a vector of sender and receivers. this vector contains the file ID
+# sender_id <- task_v2[,1] # column 1 is und_from_file_id
+# receiver_id <- task_v2[,2] # column 2 is und_to_file_id
+# 
+# write.csv(data.frame(sender_id = sender_id, receiver_id = receiver_id), 'sender_receiver_id_ver4.csv')
+# # replace the file id with the folder owner names.
+# sender_name <- ownership_withid$new_owner[match(sender_id, ownership_withid$ID_File_und)]
+# receiver_name <- ownership_withid$new_owner[match(receiver_id, ownership_withid$ID_File_und)]
+# write.csv(data.frame(sender_id = sender_name, receiver_name = receiver_id), 'sender_receiver_name_ver4.csv')
+# 
+# table(is.na(sender_name)) # 12958 instances of NA
+# table(is.na(receiver_name)) # 14720 instaces of NA
+# 
+# # the files which don't have a folder owner name (no match) are NA for the moment. 
+# # Replace NA with the original file ID number for testing purposes
+# snd_na_idx <- which(is.na(sender_name)) # this returns row numbers
+# sender_name[snd_na_idx] <- sender_id[snd_na_idx] # this replaces NA with the original file ID
+# 
+# rcv_na_idx <- which(is.na(receiver_name)) # this returns row numbers
+# receiver_name[rcv_na_idx] <- receiver_id[rcv_na_idx] # this replaces NA with the original file ID
+# 
+# write.csv(data.frame(sender_id = sender_name, receiver_name = receiver_id), 'sender_receiver_name2_ver4.csv')
+# 
+# # TODO: check Mahdi's comment replace file IDs with owner from previous version
+# # first file with no onwer has the file ID 52. 
+# head(ownership_withid)
+# ownership_withid %>% filter(ownership_withid$ID_File_und == 52) # no file 52
+# # ownership_withid only for version 2?
+# # No check line 242. ownership_withid is a subset of DF. DF is the complete dataset. o
+# # ownership_withid only contains the columns 7 (ID_File_und) and 45 (new owners)
+# # 
+# # create the micro task communication edgelist
+# reqcomm_v2 <- cbind(sender_name, receiver_name, task_v2$weight)
+# View(reqcomm_v2)
+# 
+# # count number of file IDs that have no owner
+# # length(snd_na_idx) + length(rcv_na_idx) # 27678 error here. These are row numbers, not file IDs
+# 
+# # proportion of files with no owner
+# length(snd_na_idx)/dim(reqcomm_v2)[1] # 0.78
+# length(rcv_na_idx)/dim(reqcomm_v2)[1] # 0.89
+# 
+# # files with no assigned folder owner
+# no_folder_owner <- c(sender_id[snd_na_idx],receiver_id[rcv_na_idx])
+# length(unique(no_folder_owner)) # 2657 files --> need artificial name as this will be a big network
+# 
+# length(unique(DF$ID_File_und)) # number of unique file IDs in microtask DF file
+# length(unique(c(DF2$und_from_file_id, DF2$und_to_file_id))) # number of unique file IDs in task dependency file
+# 
+# length(unique(c(sender_id[snd_na_idx],receiver_id[rcv_na_idx])))/length(unique(c(DF2$und_from_file_id, DF2$und_to_file_id)))
+# # 0.06 files in task dependencies are not matched. 
+# 
+# tail(sort(table(no_folder_owner)))
+# # Ideal workflow: find out number of files with no owner. decide if keep file ID as artifical
+# # folder owner name or replace with artifical name. 
+# head(no_folder_owner)
+# ggplot(as.data.frame(no_folder_owner), aes(x = no_folder_owner)) + geom_bar() + labs(x='folder_id')
+# 
+# # the id's that are not matched do not appear in the dataset DF
+# # test assumption with id 43748, 36927, 15330
+# DF[DF$ID_File_und == 15330, c(1:4, 41, 45)]
+# DF[DF$ID_File_und == 43748, c(1:4, 41, 45)]
+# DF[DF$ID_File_und == 36927, c(1:4, 41, 45)]
+# 
+# # turn the id's for which no owner was identified into 'external_owner'
+# reqcomm_v2[snd_na_idx,1] <- 'external_owner'
+# reqcomm_v2[rcv_na_idx,2] <- 'external_owner'
+# 
+# reqcomm_v2 <- as.data.frame(reqcomm_v2) # transform dataset from matrix into data frame
+# names(reqcomm_v2)[3] <- 'weights' # assign weights to ownership dependencies
+# 
+# # remove all temporrary files
+# rm(list=ls()[grep('tmp', ls())])
+# 
+# save.image("~/Documents/gitrepo/developer_sna/analysis/clean_data.RData")
