@@ -74,7 +74,50 @@ td$active <- td$active_raw
 td[td$active_raw == 2, which(names(td) == 'active')] <- 1 # transform the 2 into 1. 2 
 table(td$active)
 
-# step 2: create network of required commnication per version -----------------------------------------------------------------
+
+
+# Step 2: replace file Ids with folder owner names ------------------------
+
+
+# the required communication network is the td_net network. 
+# The file ids (ID_rev) need to be replaced with names of owners
+# 
+sender <- NULL 
+df2 <- data.frame(df)
+for(i in 1:length(td$und_from_file_id)){
+  #for(i in 1:100){  
+  tmp_file <- td$und_from_file_id[i]
+  tmp_ver <- td$ver[i]
+  
+  #tmp_owner <- data.frame(df[df$ID_File_und == tmp_file && df$ver == tmp_ver, 45])
+  tmp_owner <- as.vector(df2[df2$ID_File_und == tmp_file && df2$ver == tmp_ver, 45])
+  
+  if(is_empty(tmp_owner)){tmp_owner <- 'external owner'}
+  
+  sender <- c(sender, tmp_owner)
+} 
+
+td$sender <- sender
+
+receiver <- NULL 
+for(i in 1:length(td$und_to_file_id)){
+  #for(i in 1:100){  
+  tmp_file <- td$und_to_file_id[i]
+  tmp_ver <- td$ver[i]
+  
+  #tmp_owner <- data.frame(df[df$ID_File_und == tmp_file && df$ver == tmp_ver, 45])
+  tmp_owner <- as.vector(df2[df2$ID_File_und == tmp_file && df2$ver == tmp_ver, 45])
+  
+  if(is_empty(tmp_owner)){tmp_owner <- 'external owner'}
+  
+  tmp_owner <- tmp_owner[1]
+  receiver <- c(receiver, tmp_owner)
+} 
+rm(df2)
+
+td$receiver <- receiver
+
+# step 3: create network of required commnication per version -----------------------------------------------------------------
 
 # as the network should be created per version and per time period (e.g., week), this could be a list of networks
 # Potential problem: list of networks too big? 
@@ -88,11 +131,14 @@ table(td$active)
 # weight: the strenght of the technical dependency
 # version: the version number in which two files were dependent on each other
 # if the tie is active or not
+# 
+# take only the relevant columsn from td: 
+# sender, reciever, weight, version, active
 td_net <- network(td[,c(1:3, 5, 9)],matrix.type="edgelist",directed=TRUE, 
                   ignore.eval=FALSE) 
 
 td_net
-# step 3:Get network per version ------------------------------------------
+# step 4:Get network per version ------------------------------------------
 
 table(td_net%e%'ver') # if you run this line you see the number of edges per version
 
@@ -118,5 +164,5 @@ save.image('td_netVer1.RData')
 
 
 # create the network communication required -------------------------------
-# the required communication network is the td_net network. 
-# No further modification is necessary. 
+
+

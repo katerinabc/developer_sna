@@ -578,7 +578,7 @@ p1 <- ggraph(g2, layout='kk') +
 
 
 # collaboration realized matrix -------------------------------------------
-# create the collaboration required matrix (CR). This is the DV network
+# create the collaboration realized matrix (CR). This is the DV network
 # 
 #task_df <- DF[DF$ver == working_version,c(1,7)]
 
