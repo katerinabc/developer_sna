@@ -6,10 +6,6 @@ library(pathological)
 library(tidyverse)
 source('data_import.R', echo=T)
 
-# 10/09/2019: ended at: 
-
-# TODO: ownership of modified files. 
-
 
 # Create dataset own. This dataset describes ownership of folders based on when they were first
 # created. 
@@ -22,18 +18,26 @@ source('data_import.R', echo=T)
 # 
 # the data frame own is a look up data frame to check who first created a folder. It does
 # not contain folder onwership transfer when members change.
-# make sure DF is sorted
+# 
+# create a numeric version of the column version
 DF$ver <- as.numeric(DF$ver)
+# make sure DF is sorted
 DF <- DF[order(DF$ver),]
 
-own <- DF[,c(1,39, 40)] # ME: Use filename column with short filenames
+#create the object OWN using 3 columns: author (1), ID rev (39) and filename(40)
+own <- DF[,c(1,39, 40)] 
+#check dimensions
 dim(own)
-own <- own[order(own$ID_rev),] # sort the files
-table(duplicated(own[,2])) # check for duplicate filenames
-own <- own[!duplicated(own[,2]),] # remove duplicates
+# sort the files
+own <- own[order(own$ID_rev),] 
+# check for duplicate filenames and remove them
+table(duplicated(own[,2])) 
+own <- own[!duplicated(own[,2]),] 
 
+#check the column names of OWN
 names(own)
-own <- own[,-2] # remove the colum ID rev as not needed in the future
+# remove the colum ID rev as not needed in the future
+own <- own[,-2] 
 
 get_folder_name <- function(x){
   # function to decompose the file path and get the last folder. 
@@ -53,14 +57,14 @@ get_folder_name <- function(x){
   return(x)
 }
 
-# To the data frame own we are going to add the names of the folder. This is done by 
+# To the data frame OWN we are going to add the names of the folder. This is done by 
 # looping through each row in DF. lapply applies the function 'get_folder_name' to all
-# entries (rows) in own[,2]
+# entries (rows) in the second column of OWN. Unlist "flattens" the list lapply create
 own$folder_names <- unlist(lapply(own[,2], get_folder_name)) # returns the foldername
 write_csv(own, "ownership_file_created.csv") # looks good
 
 # remove duplicates from the folder_names file. The first instance is always kept
-# this will be the folder owner.
+# this will be the folder owner.x1
 dim(own)
 head(own)
 own <- own[!duplicated(own[,3]),]
@@ -71,7 +75,7 @@ dim(own)
 # 2. match folder name with folder name in own
 # 3 return the author of the matched folder name in step 2
 # 
-# the function decompose_path throws an error if there are dupliate folder 
+# the function decompose_path throws an error if there are duplicate folder 
 # names. to avoid this, loop over folder names, create vector with folder names (tmp2)
 # add tmp2 to DF 
 # 
@@ -165,54 +169,54 @@ contr_now_mod <- contr_now[-contr_now$contribution == 0,]
 # At this point DF contains the authors (those who created or modified a file), 
 # the folder names, and the folder owners (based on who first created a folder).
 # 
-# Folder ownership has been so far assigned based on who first created a folder. This onwership has been 
+# Folder ownership has been so far assigned based on who first created a folder. This ownership has been 
 # applied to all folders regardless if the developer is a member of the version. 
 # Now we need to change the folder owners for those who left the project.
 # Gaining Ownership if the owner left is based on contribution to folders.
 # ownership can not be re-gained by re-joining the team.
 
-# checking that folder owners are in character tyeps and not categories
+# checking that folder owners are in character types and not categories
 DF$folder_owner <- as.character(DF$folder_owner) 
 authatt$author <- as.character(authatt$author)
 
-# how often has a developer be assigned to a folder, but isn't member in that version. 
+
 # Membership in a project is indicated through the logical vector members. 
-# row names are folder owners, first colum (FALSE) means the owner is not a member
+# row names are folder owners, first column (FALSE) means the owner is not a member
 # of a version while being assigned membership. So alberto has been assigned 
 # ownership to 218 folders while not being part of the version team. He has been assigned
 # ownership to 76 folders while being part of the team. 
-table(DF$folder_owner, DF$members)
+table(DF$folder_owner, DF$members) # how often has a developer be assigned to a folder, but isn't member in that version. 
 
 # top contributor per version per folder
 
 # CREATE A LOOK UP TABLE
 # This is creating a lookup table with the following information: 
-# group DF by version number, then folder names, and then authors and add a column with info about
-# how often the author made a contribution to a specific folder in a specific version.
+# group DF by version number, then folder names, and then developer and add a column with info about
+# how often the developer made a contribution to a specific folder in a specific version.
 contr_now <- DF %>% group_by(ver, folder_names, author) %>% summarize(contribution = n())
 
-# transform the tiddy table into a data frame and keep only those authors who made the 
-# higest contribution to a folder in a version.
-# 1 means to return only 1 row. As 1 is positive it returns the row with the higest value
-# the ordering is indicated by contribution
+# transform the tiddy table created in the previous line into a data frame and keep only those developers who made the 
+# highest contribution to a folder in a version.
+# in top_n, 1 means to return only 1 row. As 1 is positive it returns the row with the highest value
+# in top_n, the second argument telsl R how to sort the column. 
 top_contr_now <- contr_now %>%group_by(ver, folder_names) %>% top_n(1, contribution)
 
 # creating an index with row numbers of those developers who are not a member in 
-# version x but author of a folder that has been modified in version x
+# version x but owner of a folder that has been modified in version x
 idx_nonmembers <- which(DF$members == FALSE)
 
 
-# copy the folder owner names. These will be overwritten if the folde owner is not part of a version
+# copy the folder owner names. These will be overwritten if the folder owner is not part of a version
 DF$new_owner <- DF$folder_owner
+
+#subset DF by those who developers who are not a member in a given version but owner of a folder
+# not sure this is used further down
 nonmembers <- DF[idx_nonmembers, c(1:3,42:45)] # this was first folder 4
 
 # take care: if A makes highest contribution to folder XYZ, this ownership is transfered to the folders
 #  across all version
  
 # Assigning new folder owners. This will be done per version
-# 
-# 
-# 
 # 
 # A while loop is created going through the sequence of numbers in the 
 # index idx_nonmembers. The while  loop makes sure that this is only done
@@ -233,17 +237,15 @@ sink("new_owner_test.txt") #sink writes the output to a text file for inspection
 a <- 1 # a is a placeholder to sequence over idx_nonmembers
   while(DF[idx_nonmembers[a],6] < 7){
     i <- idx_nonmembers[a]
-    tmp_version <- DF[i, 6]
-    print(paste("Version: ", tmp_version, "index:", i ))
+    tmp_version <- DF[i, 6] # store the version 
+    print(paste("Version: ", tmp_version, "index:", i )) # checking if it works
     tmp_folder <- DF[i, 42] # store the folder name
-    # does the line above take care of trickling down the folder ownership 
-    # reassignment to all folders with that name
     # 
     # get all rows with tmp_folder before version 7
     tmp_idx <- which(DF$folder_names == tmp_folder & DF$ver < 7)
-    # subset rows by only taken those after i
-    # i is in the row number index in DF
-    tmp_idx <- tmp_idx[which(tmp_idx >= i)] # error here?
+    # subset rows by only taken those at or after i
+    # i is in the row number index in DF.
+    tmp_idx <- tmp_idx[which(tmp_idx >= i)] # error ???
     
     # find the top contributor for tmp_folder in version tmp_version
     tmp_contributors <- top_contr_now[top_contr_now$ver == tmp_version,]
@@ -258,14 +260,12 @@ a <- 1 # a is a placeholder to sequence over idx_nonmembers
     # id_rev 38960. small bug fix. delete this row.
   }
 
-# delete from idx_nonmebers all index for version 4 to version 6
-idx_nonmembers_branche2 <- which(DF$members == FALSE & ( DF$ver < 4 | DF$ver > 6) )
-  
-
+# delete from idx_nonmebers all index for version 4 to version 6 as
 # folder ownership in version 7 needs to reflect ownership in version 1-3
+idx_nonmembers_branche2 <- which(DF$members == FALSE & ( DF$ver < 4 | DF$ver > 6) )
 
-# it first re-runs folder ownership for version 1 to 3, then jumps to version 7
-# branche 2: version 1-3 and then 7 to 11
+# the next loop first re-runs folder ownership for version 1 to 3, then jumps to version 7
+# branch 2: version 1-3 and then 7 to 11
 
 a <- 1
 for (a in 1:length(idx_nonmembers_branche2)){ 

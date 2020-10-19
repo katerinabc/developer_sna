@@ -1,32 +1,65 @@
 # Microdynamics in Software developer teams
 
+## Progress
+Tech interface is done. 
+communication realized is done.
+communication required is not done
+Mirroring is not done. 
+
+
+25/11/19: Communication realized: work-in-progress. I need to get my head around the network dynamic package. 
+16/01/20: Comm realizes is done. The networks for branch 1 and 2 are calculated. similarity between them is 0.7
+14/10/20: Mahdi needs 3 csv files: layers of developers (communication realized), layers of dependencies (task depenndeices), ownership matrix (connecting developers to tasks)
+
 ## Data
 
 The dataset consists of a 2 mode network linkig developer to software files. The edge is the work a developer has done on the file (a = added, m = modified). Additional data is available about developers (e.g., job role, work-location, type of contract) and about the software files (tecnical dependencies between software files). 
 
-## Dependent network
+## Communication realized
+Communication realized describes the interaction between developers. Two developers are interacting with each other if they make changes to the same file in a given version. The file is created in the script *comm_realized.R*. Detailed instructions are included in that script. In brief, the steps are:
+1. Using the microtask dataset (the file that contains every action of a developer with information about when this was done, what file etc), create a matrix *Developer X Filename*. This creates a 2-mode network. This network contains no time information and no weights. 
+2. Using the 2-mode network created in step 1, transpose it to a *Developer X Developer* matrix using 2-mode project. 
 
-The dependent network is the **realized communication** between developers (`cr_net` in `version4_mirrioring.R`). It measures how often two developers were communicating with each otehr. Communication here refers to making changes in the same file. 
-Realized collaboration is $\Task_{d,f} X Task_{d,f}^T$. $Task_{d,f}$ refers to the matrix of developrs and file ownership. 
 
-## Independent Network
-The independent network is the **needed communication** between developers (`cn_net` in `version4_mirrioring.R`).It measures how often two developers should have been communicating. Communication in this context refers to *making changes in a file*. Communication between two developers is required if the developers have ownership on files which are technically dependent on each other. Two files are technically dependent on each other, if file 1 makes a reference to objects/functions in file 2. When something is changed in file 1, it is necessary to check file 2 to ensure no bug is created. *Ownership* is defined in the following way:
+## Ownership assignment
+file: ownership_developer_sna.R
+THe owner of folders are added to the data set. Ownership is defined as (1) the first person who created the folder or (2) the first person who did a modification to a file in a folder if the original folder owner is not anymore part of the project team. Ownership can not be regained when re-entering the project. 
+There remains an error with some folders having no owner. This is an issue for version 4. The frequency of wrong assignments of folder owner (assigning a folder owner who is not a member of the project) is low for the other version 
+
+    ver |  n  | freq
+  ______   _____ _____
+  3   |  1   |0.77
+  4   | 102  |78.5 
+  5   |   12 | 9.23
+  6   |   15 |11.5 
+
+
+## OLD NOTES
+
+### Dependent network
+
+The dependent network is the **realized communication** between developers. A realization is when two developers work on the same file (e.g. one could creates it another one could modified it) while developing a given version. This is regardless of who is owner of what. 
+
+### Independent Network
+The independent network is the **required (needed) communication** between developers. It was first named `cn_net` and computed in `version4_mirrioring.R`. After discussion, it has been re-computed in the file `tech_interface.R`. It is called `td_net`.
+
+The required communication measures how often two developers should have been communicating. Communication in this context refers to *making changes in a file*. Communication between two developers is required if the developers have ownership of files which are technically dependent on each other. Two files are technically dependent on each other, if file 1 makes a reference to objects/functions in file 2. When something is changed in file 1, it is necessary to check file 2 to ensure no bug is created. *Ownership* is defined in the following way:
 1. The developer who created first a folder owns the files that are in the folder. 
 2. If a developer is not anymore member of the project, s/he looses ownership of the files of the previously owned folder. 
-3. Ownership of the folder is transferred to the first developer who makes a change to files in the respective folder.  
-Needed collaboration is $\Ownership_{d,f} X Dependencies_{f,f} X Ownership_{d,f}^T$. $\Ownership_{d,f}$ is the matrix describing who owns what folder. $\Dependencies_{f,f}$ is the square matrix listening the technical dependencies between folders. The task dependencies matrix currently does not take into account how strongly two files are dependent on each other. 
+3. Ownership of the folder is transferred to the developer who makes most contribution to the folder in the version. The new owner remains until s/he leaves the project. Ownership can not be regained by re-joining the team. 
 
-Important for calculating `cn_net` was that the files in the ownership matrix are also the files in the task dependencies matrix. Files that appeared in one matrix, but not in the other one, needed to be deleted. Additionally, the names of the files needed to be in the same sequence in both matrices. Line 303 - 443 describe the process:
-1. Create a bipartite graph with developers and files they own based on folder ownership. 
-2. Create a graph with file dependencies. 
-3. For each graph, extract the vertex names. For the first graph, the biparite graph, names are developers and file ids. For the second graph the name is only file ids. 
-4. Match the two vertex names. The names in the bipartite graph serve as a reference. This means that all file ids not in the Onwernship matrix will be excluded from the task dependencies. 
-5. Create a subgroup from the 2nd graph (file depencnies), keeping only the files which are also in the ownership file. 
-6. Transform the graphs into matrices and do the multiplication necessary to create `cr_net` (line 442).
+The required communication network is created by replacing the file IDs in the file-by-file edgelist by the owners. Ownership information has been computed and added to the developer-file table. This table contains information about each change in the software. We have added one column to the data to indicate who owns the folder where the file is located which has been modified by a developer. 
 
-After the two networks are created, I checked if the same people are in the networks (line 474 - 486). Those that were missing were added to the task dependencies network. I only added the nodes with no edges to anybody.
+The network is created in step 3 in the file `tech_interface.R`. The network object is *big* because it also contains information about the version and the strength of technical dependence. The advantage is that a network can be easily created for each version, however, large objects clog down the memory. 
 
-## Familiarity between developers
+
+
+
+
+
+
+
+### Familiarity between developers
 Familiarity between developers is the number of times two developers worked on a previous version of the software together. 
 
 
@@ -48,7 +81,7 @@ The first solution was to check collinearity between variables. The command 'kcy
 4 4041            585          1230              982          42
 
 
-## Technical information
+### Technical information
 `data_import.R` imports and cleans the datasets. In that file the following objects are created:
 * DF: data set with *microtasks*. This is the export Mahdi got from the software company. It describes every event during software development, meaning all the files that were created and modified. 
 * DF2: data set with file dependencies. It shows how often a file is dependent on another file. 
