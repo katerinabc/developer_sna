@@ -63,7 +63,7 @@ el <- df %>% select(author, folder_owner, ver, Date)
 # el_freq groups el by developer (author), folder owner and version. It then counts how often this combination exists. This is the edge weight. 
 # For example alberto worked as developer on a file in a folder owned by alberto in version 2 35 times.
 el_freq <- el %>% group_by(author, folder_owner, ver) %>% count()
-# save the file. You need to specify a file name.
+# save the file. You need to specify a file name.t
 write_csv(el_freq, 'communication_realized_edge_weight_by_version.csv') 
 
 # this is similar to the previous line, just that date information is taken into account. 
@@ -147,12 +147,12 @@ cr_dyn
 plot(cr_dyn)
 
 
-# render.d3movie(cr_dyn, 
-#                plot.par=list(displaylabels=T),
-#                output.mode = 'HTML',
-#                filename='cr.html')
-# filmstrip(cr_dyn)
-# timeline(cr_dyn)
+render.d3movie(cr_dyn,
+               plot.par=list(displaylabels=T),
+               output.mode = 'HTML',
+               filename='cr.html')
+filmstrip(cr_dyn)
+timeline(cr_dyn)
 
 
 
