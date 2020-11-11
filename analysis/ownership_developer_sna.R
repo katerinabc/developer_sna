@@ -17,7 +17,7 @@ source('data_import.R', echo=T)
 # ID rev is needed to make sure that the files are sorted properly. 
 # 
 # the data frame own is a look up data frame to check who first created a folder. It does
-# not contain folder onwership transfer when members change.
+# not contain folder ownership transfer when members change.
 # 
 # create a numeric version of the column version
 DF$ver <- as.numeric(DF$ver)
@@ -371,6 +371,56 @@ ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() 
 ggsave('ownership_change.png')
 
 write_csv(DF, "df_modified.csv" )
+
+
+# create a file owner & file name (n*m) matrix ----------------------------
+
+# load the file df_modified as DF if starting a new session
+DF <- read_csv("df_modified.csv")
+
+# subset DF created above to only take the column with the file name and the folder owner 
+# the column filename is the shorter version of Filename
+nm <- DF %>% select(new_owner, filename, ver)
+
+write_csv(nm, 'ownership_edgelist_csv')
+
+# add weights to the edgelist by counting how often developer-file pair is in nm. 
+# This drops the column version
+nm_all <- nm %>% group_by(new_owner, filename) %>% count()
+#inspect
+nm_all
+
+# create one huge matrix
+#load the igraph package
+library(igraph)
+# create a 2 mode graph from nm_all, excluding the weight column. This will be added later manually
+g <- graph.data.frame(nm_all %>% select(-n), directed = F)
+#the second column of edges is TRUE type (file names are set as type == TRUE)
+V(g)$type <- V(g)$name %in% nm_all[,2] 
+# add edge weights.
+# pull means to pull out the data from the tibble object nm_all. 
+# as.numeric makes sure the data is in number format
+E(g)$weight <- as.numeric(pull(nm_all[,3]))
+g
+
+# you can plot g, but best not in R. It's better do it in Gephi. 
+# R might crash as it is too big. 
+
+# transform the graph into a matrix. 
+# The sparse=FALSE argument tells it to show the 0s in the adjacency matrix. 
+# the attr= n argument tells it to show the edge value
+g_all <- get.incidence(g, sparse = TRUE) # this will cause R to crash
+# 
+# As I can't pull out the complete network at once, I could
+# option 1: take out all nodes that aren't in the comm realized network
+# option 2: pull out only a subset and then glue the matrices together
+
+
+
+
+
+# OLD CODE ----------------------------------------------------------------
+
 
 # go to file 'tech interface' to create the networks
 

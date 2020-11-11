@@ -99,22 +99,28 @@ td <- cbind(td, active_snd, active_rc)
 td$active_raw <- td$active_snd + td$active_rc # a tie is active if the snd OR rc file is modified during that version 
 # count the number of not-adctive (0), one-active (1), and both-active (2) pairs of files
 table(td$active_raw) 
+# 204385 non-active file pairs, 22360 file pairs with 1 active file, 684 active file pairs
 #check the column names
 names(td) 
 # create a new column active. This column has the same content as active_raw (a numerical vector of 0, 1, 2)
 td$active <- td$active_raw
 # in the column active (just created above), change all 2s into 1s. Now we have a vector of 0s (no file active) and
 # 1s (1 or 2 files active)
-td[td$active_raw == 2, which(names(td) == 'active')] <- 1 # transform the 2 into 1. 2 
+td[td$active_raw == 2, which(names(td) == 'active')] <- 1 
 # count the number of not-active (0) and active (1) files
 table(td$active)
+dim(td)
 
 # save the result in a r object
 saveRDS(td, "td.rds")
 
 # save the result in a csv file. 
-write_csv(td, 'td.csv')
+write_csv(td, 'td_all.csv')
 
+# filter td to only include active files
+td_active <- td[which(td$active == 1), ]
+dim(td_active)
+write_csv(td_active, 'td_active.csv')
 # Step 2: replace file Ids with folder owner names ------------------------
 
 
