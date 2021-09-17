@@ -382,7 +382,7 @@ DF <- read_csv("df_modified.csv")
 # the column filename is the shorter version of Filename
 nm <- DF %>% select(new_owner, filename, ver)
 
-write_csv(nm, 'ownership_edgelist_csv')
+write_csv(nm, 'ownership_matrix_csv')
 
 # add weights to the edgelist by counting how often developer-file pair is in nm. 
 # This drops the column version

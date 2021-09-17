@@ -1,10 +1,13 @@
 # Communication realized script
-
-# update 14.10.20: I THINK THE LOGIC HOW COMM REALIZED IS CREATED IS WRONG. CHECK README FILE AND REDO IF NECESSARY. ALSO CLEAN UP FOLDER. TOO MANY FILES. 
+# 
+# 
+# updated 22 March 2021
 # 
 # clean your workspace first 
 rm(list=ls())
-library(ndtv)
+
+# todo
+# why terminus is Inf?
 
 # instructions ------------------------------------------------------------
 
@@ -33,6 +36,7 @@ library(tidyverse)
 # for dynamic network data
 library(networkDynamicData) 
 library(sna)
+library(ndtv)
 
 #load the dataset. df_modified has been created in the file ownership_developer_sna.R
 #df_modified is 
@@ -59,7 +63,7 @@ el <- df %>% select(author, folder_owner, ver, Date)
 
 # com realized csv export -------------------------------------------------
 
-# group_by is a function that lets you group data sets by specfic columns and then run stats on this grouping.
+# group_by is a function that lets you group data sets by specific columns and then run stats on this grouping.
 # el_freq groups el by developer (author), folder owner and version. It then counts how often this combination exists. This is the edge weight. 
 # For example alberto worked as developer on a file in a folder owned by alberto in version 2 35 times.
 el_freq <- el %>% group_by(author, folder_owner, ver) %>% count()
@@ -92,8 +96,13 @@ cr_el <- arrange(cr_el, Date)
 # for all edges. Unless they remain active for the whole duration. 
 # Use edge.toggles instead of edge.changes
 # 
-cr_el <- cr_el %>% add_column(time = 1:nrow(cr_el),
-                              direction = 1) 
+# using the code below, every action is considered it's own step. 
+# cr_el <- cr_el %>% add_column(time = 1:nrow(cr_el), direction = 1) 
+cr_el
+
+# the version column is the time information
+cr_el <- cr_el %>% add_column(direction = 1) 
+names(cr_el)[which(names(cr_el) == 'ver')] <- 'time' 
 
 # inspect what was created.
 head(cr_el)
@@ -113,6 +122,7 @@ names(cr_el)[which(names(cr_el) == "id.y")] <- 'head'
 
 #inspect the object
 cr_el
+write_csv(cr_el, 'cr_el.csv')
 
 #subset cr_el to have only the columns that are needed
 cr_el_modified <- as.data.frame(cr_el %>% select(time, tail, head, direction))
@@ -124,6 +134,7 @@ cr_elm <- as.matrix(cr_el_modified)
 # this is because of the dimnames for rows. 
 cr_dyn <- networkDynamic(edge.toggles = cr_elm)
 
+save(cr_dyn, file = 'cr_dyn.RData')
 # plot of complete network
 plot(cr_dyn)
 
@@ -131,21 +142,21 @@ plot(cr_dyn)
 # in the line below if ver is replaced with Date, 
 # the network is done per time point
 
-cr_el <- as.data.frame(cr_el %>% select(ver, tail, head, direction))
-head(cr_el)
-#rename the first column in cr_el to be called time
-names(cr_el)[1] <- 'time'
-# create a networkdynamic object
-cr_elm <- as.matrix(cr_el)
-# when loading the dataframe there is an error with the dimnames. KBC thinks
-# this is because of the dimnames for rows. 
-cr_dyn <- networkDynamic(edge.toggles = cr_elm)
-cr_dyn
-network.dynamic.check(cr_dyn)
-cr_dyn
-# plot of network
-plot(cr_dyn)
-
+# cr_el <- as.data.frame(cr_el %>% select(ver, tail, head, direction))
+# head(cr_el)
+# #rename the first column in cr_el to be called time
+# names(cr_el)[1] <- 'time'
+# # create a networkdynamic object
+# cr_elm <- as.matrix(cr_el)
+# # when loading the dataframe there is an error with the dimnames. KBC thinks
+# # this is because of the dimnames for rows. 
+# cr_dyn <- networkDynamic(edge.toggles = cr_elm)
+# cr_dyn
+# network.dynamic.check(cr_dyn)
+# cr_dyn
+# # plot of network
+# plot(cr_dyn)
+# 
 
 render.d3movie(cr_dyn,
                plot.par=list(displaylabels=T),

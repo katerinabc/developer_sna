@@ -62,8 +62,9 @@ version_transformation <- cbind(version_transformation,
 version_transformation <- version_transformation[,c(1,3,2)]
 # check if new version numbering is ok, then override all ver values
 authatt$ver2 <- as.numeric(version_transformation[,3][match(authatt$ver, version_transformation[,2])])
-authatt$ver <- as.numeric(version_transformation[,3][match(authatt$ver, version_transformation[,2])])
+#authatt$ver <- as.numeric(version_transformation[,3][match(authatt$ver, version_transformation[,2])])
 
+write.csv(authatt, "authatt.csv")
 # take care. check structure. lots of variables read as characters
 
 

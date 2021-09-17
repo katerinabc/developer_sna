@@ -42,7 +42,7 @@ rm(list=ls())
 # Tip2: To run a R script within a R script you write source(file name) as written in line 47. The 
 # option echo=F (or T for true) is for not showing output in the console. 
 
-# By runnin the next line of code, all the required data objects
+# By running the next line of code, all the required data objects
 # are created. This is not necessary if you have a saved RData file (see line 11)
 source('ownership_developer_sna.R', echo=T)
 
@@ -597,6 +597,8 @@ library(igraph)
 task_df_bip <- graph.data.frame(task_df, directed = F)
 V(task_df_bip)$type <- V(task_df_bip)$name %in% task_df[,2] #the second column of edges is TRUE type
 task_df_bip
+
+
 # Transform bipartite network into affiliation matrix
 task_df_mat <- as_incidence_matrix(task_df_bip)
 
