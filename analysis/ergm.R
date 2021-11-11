@@ -4,7 +4,7 @@
 # project owner: Mahdi
 # 
 # created: 23 November 2020
-# updated: 3rd August 2021
+# updated: 2nd November 2021
 # problem to run model. unable to fork: resources temporarily unavailable: 
 # memory issue
 # 
@@ -153,9 +153,14 @@ fam_dev_net <- network(as.matrix(fam_dev), directed=F, ignore.eval=F, names.eval
 fam_dev_net
 fam_dev_net%e%'weights'
 
-# basic model -------------------------------------------------------------
 
-# a geometric reference distirbution is taken as the valued data represents
+# valued ergm --> direction abandoned -------------------------------------
+
+# on October 7th 2021 the team decided to abandon valued ergm
+# and use binary data for the DV. The following valued ERGMS are
+# not further developed
+
+# a geometric reference distribution is taken as the valued data represents
 # count data.
 # 
 
@@ -166,7 +171,7 @@ dev01 <- ergm(dv ~ sum, response="weights", reference=~Geometric)
 summary(dev01)
 # the chance of an additional realized communication tie is exp(-0.13), 
 # the intercept for sum
-exp(-0.13) #87%
+exp(-0.135) #87%
 
 
 dev02 <- ergm(dv ~ sum + nonzero
@@ -182,6 +187,8 @@ dev02 <- ergm(dv ~ sum + nonzero
 # Error in svd(X) : infinite or missing values in 'x'
 # 3/8/21: model runs (tried 3 times)
 summary(dev02)
+exp(0.004013)
+
 # the chance of an additional realized communication tie (variable: sum; 
 # similar to intercept) is sum: exp (-0.05)
 # the chance of an additional realized communication tie, if there is a 
@@ -199,17 +206,114 @@ summary(dev03)
 dev04 <- ergm(dv ~ sum + nonzero
               + edgecov(ivnet, attrname = 'weights', form = 'sum') 
               + edgecov(fam_dev_net, attrname = 'weights', form = 'sum')
-              + nodefactor(attr = 'jobtitle') 
-              + nodematch(attr = 'location', diff = FALSE), 
+              #+ nodefactor(attr = 'jobtitle'),
+              + nodematch(attr = 'location', diff = TRUE), 
               response="weights", reference=~Geometric)
 summary(dev04)
+# error Error in qr.default(v, tol = tol) : 
+# NA/NaN/Inf in foreign function call (arg 1)
+
+
+# dichotomize data --------------------------------------------------------
+
+# Distribution of values
+
+ggplot(dv_master, aes(x=n)) + geom_bar()
+# power law distribution. 
+# One outlier: > 1200
+# A lot of people between 0 and 125
+
+quantile(dv_master$n, probs = seq(0, 1, 0.1))
+# 50th:n= 8
+# 70th: n = 24.8
+# 90th: n = 89.6
+
+
+adorn_cumulative <- function(dat, colname, dir = "down"){
+  
+  if(!missing(colname)){
+    colname <- rlang::enquo(colname)
+  } else if("valid_percent" %in% names(dat)) {
+    colname <- rlang::sym("valid_percent")
+  } else if("percent" %in% names(dat)){
+    colname <- rlang::sym("percent")
+  } else {
+    stop("\"colname\" not specified and default columns valid_percent and percent are not present in data.frame dat")
+  }
+  
+  target <- dplyr::pull(dat, !! colname)
+  
+  if(dir == "up"){
+    target <- rev(target)
+  }
+  
+  dat$cumulative <- cumsum(ifelse(is.na(target), 0, target)) + target*0 # an na.rm version of cumsum, from https://stackoverflow.com/a/25576972
+  if(dir == "up"){
+    dat$cumulative <- rev(dat$cumulative)
+    names(dat)[names(dat) %in% "cumulative"] <- "cumulative_up"
+  }
+  dat
+}
+
+
+janitor::tabyl(dv_master, n) %>% 
+  adorn_cumulative() %>%
+  janitor::adorn_pct_formatting(digits=2) %>%
+  write_csv('frequency distribution DV net.csv')
+
+janitor::tabyl(dv_master, n) %>% 
+  adorn_cumulative() %>%
+  janitor::adorn_pct_formatting(digits=2) %>%
+  write_csv('frequency distribution DV net.csv')
+ 
+# frequency distribution per version
+
+ggplot(dv_master, aes(x=n, fill = factor(ver))) + 
+  geom_bar() +
+  facet_wrap(~ ver)
+
+dv_quantiles <- NULL
+for (i in 1:max(dv_master$ver)) {
+  tmp <- dv_master[dv_master$ver == i,]
+  tmp2 <- quantile(tmp$n, probs = seq(0, 1, 0.1))
+  dv_quantiles <- cbind(dv_quantiles, tmp2)
+}
+colnames(dv_quantiles) <- paste("ver", seq(1:max(dv_master$ver)))
+dv_quantiles
+
+write_csv(as_tibble(dv_quantiles), "dv_quantiles.csv", row.names=TRUE)
+
+#reshape from wide to long for ggplot
+dv_quantiles <- as_tibble(dv_quantiles) %>% pivot_longer(cols = starts_with("ver"), names_to ="version", values_to="value")
+
+ggplot(dv_quantiles, aes(value, version, color = version)) + 
+  geom_point() 
+
+ggplot(dv_master, aes(x = n, factor(ver))) + 
+  geom_violin() + 
+  ggsave('frequency distribution DV net.png')
+
+# I think the cut-off should be dynamic for each version. Maybe something like 
+# mean + standard deviation
 
 
 
+# contining with valued ERGM  ---------------------------------------------
+
+# focus on including structural variables
+
+dev05 <- ergm(dv ~ sum + nonzero #intercept
+              + edgecov(ivnet, attrname = 'weights', form = 'sum') 
+              # + sociality, # result sin NA/NaN/Inf in foreign function call
+              + nodecovar # NA/NaN/Inf in foreign function call 
+              , response="weights", reference=~Geometric)
 
 
 
-# Analysis from 25th March 2021
+## 25th March 2021 ---------------------------------------------------------
+
+# This analysis wasn't stable. A lot of errors. Can't trace it back 
+# to its source. 
 dev02 <- ergm(dv ~ sum + nonzero 
               + edgecov(ivnet, attrname = 'weights', form = 'sum') 
               + edgecov(fam_dev_net, attrname = 'weights', form = 'sum'),

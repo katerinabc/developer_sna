@@ -8,6 +8,8 @@ rm(list=ls())
 
 # todo
 # why terminus is Inf?
+# question: 
+# 09.nov.2021 is the valued data maintained??? I don't think so
 
 # instructions ------------------------------------------------------------
 
@@ -110,7 +112,7 @@ head(cr_el)
 # replace authors with ID as networkdynamic works with IDs
 developers <- data.frame(developer = as.character(unique(authatt$author)),
                          id = seq(1:length(unique(authatt$author))))
-
+write_csv(developers, 'developer_name_id.csv')
 # replace names with ids. Left-join works similar to the lookup functions in excel. The dataset cr_el and developers are joined, by looking for shared identifier. 
 # The identifiers are author/developer. In cr_el the column name is author and in developers the column name is developer. The information in these two columns are the same. 
 cr_el <- cr_el %>% left_join(developers, by = c('author' = 'developer'))
