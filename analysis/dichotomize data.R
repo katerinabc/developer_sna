@@ -4,10 +4,35 @@ rm(list=ls())
 # project owner: Mahdi
 # 
 # created: 04 November 2021
-# updated: 09 November 2021
+# updated: 10 November 2021
 # 
-# TODO check if names correctly added in original network
- 
+# 
+# debugging
+# degree values in dv_original are different to degree values in dv_mean, 
+# dv_median
+# 
+# degree values in dv_mean are the same than in dv_median
+# 
+# 
+# TODO 
+
+# Explanation of workflow using "dichotomize using the mean"
+# as the basis
+# 
+# 1. calculate edges
+# for each version calculate the mean ver_mean
+# for each version if the edge value is > ver_mean then edge = 1 unless 0
+# 
+# 2. create networks
+# for each version create the network using the edgelist created in step 1
+# look for which developer were missing
+# add the missing developers
+# calculate degree centrality, and betweenness
+# 
+# 3. create a dataset for each dichotomization with rows as developers and 
+# columns as SNA metrics
+# 
+# 4. calculate correlations
 
 # packages ----------------------------------------------------------------
 
@@ -21,6 +46,104 @@ library(statnet)
 
 source("creating_networks.R")
 all_developers <- as.vector(dv %v% 'vertex.names')
+
+
+
+# functions ---------------------------------------------------------------
+
+#adjmat_to_edgelist.matrix <- function(graph, undirected, keep.isolates) {
+  # as.integer(factor(diffnet$meta$ids[fakeDynEdgelist[,1]], diffnet$meta$ids))
+  out <- adjmat_to_edgelist_cpp(methods::as(graph, "dgCMatrix"), undirected)
+  
+  # If keep isolates
+  if (keep.isolates) {
+    N <- 1:nvertices(graph)
+    test <- which(!(N %in% unlist(out[,1:2])))
+    
+    # If there are isolates
+    if (length(test)) out <- rbind(out, cbind(test, 0, 0))
+  }
+  
+  return(out)
+} # not needed
+
+cutnetworks <- function(thresholdname, version) {
+  # this function dichotomizes the networks 
+  
+  # set columns we need to use
+  colnumbers <- match(c("author", "folder_owner", "ver", thresholdname), 
+                      colnames(dv_modified))
+  
+  # subset the main dataset
+  tmp1 <- dv_modified[dv_modified$ver == version, colnumbers]
+  
+  # create network
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE)
+  
+  # who is part of the network (existing_dev) and who is missing (missing_dev)
+  existing_dev <- as.vector(igraph::V(g)$name) 
+  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), dv %v% 'vertex.names')]
+  # add the missing developers
+  g <- igraph::add.vertices(g, 
+                            nv = length(missing_dev),
+                            attr = list(name = missing_dev))
+  
+  # sort developers alphabetically --> this step is not working
+  # problem: how to sort a matrix alphabetically --> check standford tutorial
+  # 
+  # transform network into matrix
+  g <- igraph::as_adjacency_matrix(g) 
+  
+  # transform matrix into edgelist. It keeps isolates, but removes names
+  #el <- netdiffuseR::adjmat_to_edgelist(g, undirected=FALSE) 
+  
+  mat <- as.matrix(g) # need to sort this, but how???
+  #g <- igraph::graph.adjacency(mat)
+  #el <- igraph::as_data_frame(g, what = "both")
+
+  net <- network(mat, directed=F)
+  
+  # el <- as.edgelist(net, output = "tibble", vnames = "vertex.names") #this removes isolates
+  # as.matrix.network.edgelist(net, as.sna.edgelist=T)
+  # el <- el[sort]
+  # net <- network(el)
+  
+  # calculate network metrics
+  net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman", rescale = TRUE)
+  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected", rescale = TRUE)
+  
+  # return the network
+  return(net)
+}
+
+
+builddf <- function(networklist, df = NULL){
+  # create a dataset with rows as person and network metrics as columns
+  
+  # setup the dataframe with information from version 1
+  df <- tibble(person   = networklist[[1]] %v% 'vertex.names', 
+               mean_deg = networklist[[1]] %v% 'degree',
+               mean_btw = networklist[[1]] %v% 'betweenness')
+  colnames(df) <- c("person", 
+                     paste(colnames(df)[[2]], 1, sep="_"),
+                     paste(colnames(df)[[3]], 1, sep="_")
+  )
+  
+  for (i in 2:length(networklist)){
+    
+    # loop through all versions and save the data
+    tmp <- networklist[[i]]
+    tib <- tibble(person   = tmp %v% 'vertex.names', 
+                  mean_deg = tmp %v% 'degree',
+                  mean_btw = tmp %v% 'betweenness')
+    colnames(tib) <- c("person", 
+                       paste(colnames(tib)[[2]], i, sep="_"),
+                       paste(colnames(tib)[[3]], i, sep="_")
+    )
+    df2 <- df %>% full_join(tib, by=c("person"= "person")) 
+  }
+  return(df)
+}
 
 # calculate thresholds ---------------------------------------------------------
 
@@ -62,54 +185,13 @@ dv_modified %>%
               values_from = mean) %>%
   write_csv("dv_sum_edges_by_threshold.csv")
 
-cutnetworks <- function(thresholdname, version) {
-  colnumbers <- match(c("author", "folder_owner", "ver", thresholdname), 
-                      colnames(dv_modified))
-  tmp1 <- dv_modified[dv_modified$ver == version, colnumbers]
-  
-  # create network
-  net <- network(tmp1[,-3], directed=F, matrix.type='edgelist')
-  
-  # add missing developers
-  existing_dev <- as.vector(net %v% 'vertex.names')
-  missing_dev <- all_developers[-match(net %v% 'vertex.names', dv %v% 'vertex.names')]
- # net <- add.isolates(net, length(missing_dev), return.as.edgelist = T)
-  net <- as.network(add.isolates(net, length(missing_dev)), matrix.type = 'edgelist')
-  net %v% 'vertex.names' <- c(existing_dev, missing_dev)
-  net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman")
-  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected")
-  return(net)
-  
-  #newlist <- list()
-  # for (i in 1:1 ){
-  #   print(i)
-  # tmp1 <- tmp1[dv_modified$ver == i,]
-  # tmpnet <- network(tmp1[,-3], 
-  #                   directed=FALSE,
-  #                   matrix.type = 'edgelist') 
-  # 
-  # }
-}
-
-
 
 # original valued network -------------------------------------------------
 
-# load('cr_dyn.RData') #based on df, file by author dataset. this shows where interaction did happen
-# dv_original <- cr_dyn
-# 
-# # save dv_original as a list of networks
-# dv_original <- get.networks(cr_dyn, start = 1, end = 12)
 
-# in dv_orignal developer names replaced by developer ID
-# load developer names and id
-
-#devnames <- read_csv("developer_name_id.csv")
-
-# replace ID with developer name in dv_original
 
 dv_original <- NULL
-for (i in 1: max(dv_modified$ver) {
+for (i in 1: max(dv_modified$ver)) {
   colnumbers <- match(c("author", "folder_owner", "ver", "n"), 
                     colnames(dv_modified))
   tmp1 <- dv_modified[dv_modified$ver == i, colnumbers]
@@ -131,30 +213,35 @@ for (i in 1: max(dv_modified$ver) {
                        v = c(existing_vertx_id: 21))
   
 
-  net <- as.network(add.isolates(net, length(missing_dev)), matrix.type = 'edgelist')
+  #net <- as.network(add.isolates(net, length(missing_dev)), matrix.type = 'edgelist')
   net %v% 'vertex.names' <- c(existing_dev, missing_dev)
-  net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman")
-  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected")
+  net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman", rescale = TRUE)
+  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected", rescale = TRUE)
+  
+  dv_original[[i]] <- net
 }
 
+df_original <- builddf(dv_original)
 
 
 
-# network cut-off = mean --------------------------------------------------
-
-
+# dichotomize networks --------------------------------------------------
 
 #test <- cutnetworks("tie_mean", version = 1)
 
+# create the networks with dichotomization = mean
 dv_mean <- list()
 for (i in 1: max(dv_master$ver)){
-  print(i)
+  #print(i)
   tmp <- cutnetworks("tie_mean", version = i)
   
   dv_mean[[i]] <- tmp
   
 }
 dv_mean
+
+# pull out centrality and betweennes and store in a dataset
+df_mean <- builddf(networklist = dv_mean) # error in this code
 
 lapply(dv_mean, function(x) plot(x)) # it works
 lapply(dv_mean, function(x) plot(as.vector(x %v% 'degree')))
@@ -165,19 +252,119 @@ ggplot(data.frame(value=dv_mean[[1]] %v% 'degree',
 
 
 
-# testing correlation between networks ------------------------------------
-result <- NULL
-for (i in 1:2){
-  original <- dv_original[[i]]
-  modified <- dv_mean[[i]]
+# create the networks with dichotomization = median
+ 
+dv_median <- list()
+for (i in 1: max(dv_master$ver)){
+  #print(i)
+  tmp <- cutnetworks("tie_median", version = i)
   
-  tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
+  dv_median[[i]] <- tmp
   
-  result <- c(result, tmp)
 }
+# pull out centrality and betweennes and store in a dataset
+df_med <- builddf(networklist = dv_median)
+
+
+# create the networks with dichotomization = 75th percentile
+tie_three4th
+
+dv_three4th <- list()
+for (i in 1: max(dv_master$ver)){
+  #print(i)
+  tmp <- cutnetworks("tie_three4th", version = i)
+  
+  dv_three4th[[i]] <- tmp
+  
+}
+# pull out centrality and betweennes and store in a dataset
+df_three4 <- builddf(networklist = dv_three4th)
+
+
+# creating df with degree for all datasets --------------------------------
+
+# create vector for column names
+colnames_corr <- paste("ver", 
+                       sort(rep(seq(1:11),2)),
+                       rep(c("deg", "bet"), 11), sep="")
+
+# calculate the correlations
+# 
+# dichotomization = mean
+corr_mean <- NULL
+for (i in 2: ncol(df_original)){
+  
+  x = pull(df_original[,i])
+  print(x)
+  y = pull(df_mean[,i])
+  print(y)
+  
+  tmpcor <- cor.test(x, y)
+  summary(tmpcor)
+  
+  corr_mean <- c(corr_mean, tmpcor$estimate)
+
+}
+names(corr_mean) <- colnames_corr
+corr_mean
+
+
+# dichotomization = median
+corr_med <- NULL
+for (i in 2: ncol(df_original)){
+  
+  x = pull(df_original[,i])
+  y = pull(df_med[,i])
+  
+  tmpcor <- cor.test(x, y)$estimate
+  #tmpcor <- cor.test(x, y)$p.value
+  corr_med <- c(corr_med, tmpcor)
+  
+}
+names(corr_med) <- colnames_corr
+corr_med
+
+# dichotomization = 75th percentile
+corr_three4 <- NULL
+for (i in 2: ncol(df_original)){
+  
+  x = pull(df_original[,i])
+  y = pull(df_three4[,i])
+  
+  tmpcor <- cor.test(x, y)$estimate
+  #tmpcor <- cor.test(x, y)$p.value
+  corr_three4 <- c(corr_three4, tmpcor)
+  
+}
+names(corr_three4) <- colnames_corr
+corr_three4
+
+# put all the correlations into one dataset
+
+df_correlations <- tibble(mean = corr_mean,
+                          med = corr_med,
+                          three4 = corr_three4)
+
+# testing correlation between networks ------------------------------------
+
+# result <- NULL
+# for (i in 1:2){
+#   original <- dv_original[[i]]
+#   modified <- dv_mean[[i]]
+#   
+#   tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
+#   
+#   result <- c(result, tmp)
+# }
 
 
 
+# summary(qaptest(list(dv_original,
+#                      dv_mean[,,i]), gcor, g1 = 1, g2 = 2))$test
 
-summary(qaptest(list(dv_original,
-                     dv_mean[,,i]), gcor, g1 = 1, g2 = 2))$test
+
+# testing correlation: mean vs median  ---------------------------------------------------
+
+summary(qaptest(list(dv_mean[[1]], dv_median[[1]]), gcor, g1=1, g2=2))
+
+summary(qaptest(list(dv_mean[[1]], dv_mean[[2]]), gcor, g1=1, g2=2))
