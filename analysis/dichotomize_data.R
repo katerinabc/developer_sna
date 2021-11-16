@@ -405,31 +405,114 @@ ggplot(df_cor_lg[!is.na(df_cor_lg$value),],
 
 # testing correlation between networks ------------------------------------
 
-result <- NULL
+qapresult <- NULL
 for (i in 2:length(dv_original)){
   original <- dv_original[[i]]
   
   # calcualte qap for mean
   modified <- dv_mean[[i]]
   tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
-  result <- c(result, tmp)
+  qapresult <- c(qapresult, tmp)
   
   # calculate qap for median
   modified <- dv_median[[i]]
   tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
-  result <- c(result, tmp)
+  qapresult <- c(qapresult, tmp)
   
   # caculate qap for 75th percentile
   modified <- dv_three4th[[i]]
   tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
-  result <- c(result, tmp)
+  qapresult <- c(qapresult, tmp)
   
 }
 
-result <- as.data.frame(result)
+qapresult <- as.data.frame(qapresult)
 # rownames(result) <- paste(rep.int(c("mean", "median", "three4th"), times = length(seq(2:11))), 
 #                           "version", 
 #                           rep.int(seq(from = 2, to =11, by= 1), times = rep(3, length(c(2:11)))))
 
-result$cutoff <- paste(rep.int(c("mean", "median", "three4th"), times = length(seq(2:11))))
-result$version <- rep.int(seq(from = 2, to =11, by= 1), times = rep(3, length(c(2:11))))
+qapresult$cutoff <- paste(rep.int(c("mean", "median", "three4th"), times = length(seq(2:11))))
+qapresult$version <- rep.int(seq(from = 2, to =11, by= 1), times = rep(3, length(c(2:11))))
+
+
+ggplot(qapresult, aes(x = version, y = qapresult, color = cutoff)) + 
+  geom_point() + 
+  scale_color_brewer(type = 'qual', palette = 6) + 
+  theme_minimal() + 
+  labs(title = "Correlation between valued and dichotomized network",
+       x = 'version number', y = 'correlation') + 
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  ggsave('scatterplot_correlations_between_network.png')
+
+
+ggplot(qapresult, aes(x = version, y = qapresult, color = cutoff)) + 
+  geom_boxplot() + 
+  scale_color_brewer(type = 'qual', palette = 6) + 
+  theme_minimal() + 
+  labs(title = "Correlation between dichotomized and valued networks",
+       x = 'version number', y = 'correlation') + 
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggsave('boxplot_correlations_between_network.png')
+
+# testing correlations within a network -----------------------------------
+
+qapwithinnet <- NULL
+for (i in 1:10){
+  # calculate qap original network t and t+1
+  tmp1 <- dv_original[[i]]
+  tmp2 <- dv_original[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+
+  # calculate qap mean network t and t+1
+  tmp1 <- dv_mean[[i]]
+  tmp2 <- dv_mean[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+  
+  # calculate qap median network t and t+1
+  tmp1 <- dv_median[[i]]
+  tmp2 <- dv_median[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+  
+  # calculate qap 75th percentile network t and t+1
+  tmp1 <- dv_three4th[[i]]
+  tmp2 <- dv_three4th[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+  
+}
+
+qapwithinnet <- as.data.frame(qapwithinnet)
+rownames(qapwithinnet) <- paste(c("original", "mean", "median", "three4th"),
+                                rep(c('ver1-2', 'ver2-3', 'ver3-4', 'ver4-5', 'ver5-6',
+                            'ver6-7', 'ver7-8', 'ver8-9', 'ver9-10', 'ver10-11'), 
+                            times = rep(4, 10)), 
+                            sep="_")
+
+qapwithinnet$cutoff <- paste(rep.int(c("original","mean", "median", "three4th"), times = length(seq(2:11))))
+qapwithinnet$version <- rep(c('ver1-2', 'ver2-3', 'ver3-4', 'ver4-5', 'ver5-6',
+                              'ver6-7', 'ver7-8', 'ver8-9', 'ver9-10', 'ver10-11'), 
+                            times = rep(4, 10))
+
+ggplot(qapwithinnet, aes(x = version, y = qapwithinnet, color = cutoff)) + 
+  geom_point() + 
+  scale_color_brewer(type = 'qual', palette = 6) + 
+  theme_minimal() + 
+  labs(title = "Correlation within a network",
+       caption = "Correlates ver1 with ver2, ver2 with ver 3 for original network and the 3 types of dichotomzied networks",
+       x = 'version number', y = 'correlation') + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  ggsave('scatterplot_correlations_within_network.png', width = 10, height = 6.82, unit = "in")
+
+
+ggplot(qapwithinnet, aes(x = cutoff, y = qapwithinnet, color = cutoff)) + 
+  geom_boxplot() + 
+  scale_color_brewer(type = 'qual', palette = 6) + 
+  theme_minimal() + 
+  labs(title = "Correlation within a networks",
+       caption = "Correlates ver1 with ver2, ver2 with ver 3 for original network and the 3 types of dichotomzied networks",
+       x = 'version number', y = 'correlation') + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggsave('boxplot_correlations_within_network.png', width = 10, height = 6.82, unit = "in")
