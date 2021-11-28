@@ -14,7 +14,7 @@ rm(list=ls())
 # degree values in dv_mean are the same than in dv_median
 # 
 # 
-# TODO 
+# TODO try qap with tie = 1 if edge value >= median(edge value), 50th percentile, 25th percentile
 
 # Explanation of workflow using "dichotomize using the mean"
 # as the basis
@@ -51,101 +51,8 @@ all_developers <- as.vector(dv %v% 'vertex.names')
 
 # functions ---------------------------------------------------------------
 
-#adjmat_to_edgelist.matrix <- function(graph, undirected, keep.isolates) {
-  # as.integer(factor(diffnet$meta$ids[fakeDynEdgelist[,1]], diffnet$meta$ids))
-  out <- adjmat_to_edgelist_cpp(methods::as(graph, "dgCMatrix"), undirected)
-  
-  # If keep isolates
-  if (keep.isolates) {
-    N <- 1:nvertices(graph)
-    test <- which(!(N %in% unlist(out[,1:2])))
-    
-    # If there are isolates
-    if (length(test)) out <- rbind(out, cbind(test, 0, 0))
-  }
-  
-  return(out)
-} # not needed
 
-cutnetworks <- function(thresholdname, version) {
-  # this function dichotomizes the networks 
-  
-  # set columns we need to use
-  colnumbers <- match(c("author", "folder_owner", "ver", thresholdname), 
-                      colnames(dv_modified))
-  
-  # subset the main dataset
-  tmp1 <- dv_modified[dv_modified$ver == version, colnumbers]
-  # remove all edges with no tie (cell value = 0)
-  tmp1 <- tmp1[!tmp1[,4] == 0, ]
-  
-  # create network
-  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
-  
-  # who is part of the network (existing_dev) and who is missing (missing_dev)
-  existing_dev <- as.vector(igraph::V(g)$name) 
-  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), dv %v% 'vertex.names')]
-  # add the missing developers
-  g <- igraph::add.vertices(g, 
-                            nv = length(missing_dev),
-                            attr = list(name = missing_dev))
-  
-  # sort developers alphabetically --> this step is not working
-  # problem: how to sort a matrix alphabetically --> check standford tutorial
-  # 
-  # transform network into matrix
-  g <- igraph::as_adjacency_matrix(g) # this is not sorted alphabetically
-  
-  # transform matrix into edgelist. It keeps isolates, but removes names
-  #el <- netdiffuseR::adjmat_to_edgelist(g, undirected=FALSE) 
-  
-  mat <- as.matrix(g)
-  #g <- igraph::graph.adjacency(mat)
-  #el <- igraph::as_data_frame(g, what = "both")
-
-  net <- network(mat, directed=F)
-  
-  # el <- as.edgelist(net, output = "tibble", vnames = "vertex.names") #this removes isolates
-  # as.matrix.network.edgelist(net, as.sna.edgelist=T)
-  # el <- el[sort]
-  # net <- network(el)
-  
-  # calculate network metrics
-  net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman", rescale = TRUE)
-  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected", rescale = TRUE)
-  
-  # return the network
-  return(net)
-}
-
-
-builddf <- function(networklist, df = NULL){
-  # create a dataset with rows as person and network metrics as columns
-  
-  # setup the dataframe with information from version 1
-  df <- tibble(person   = networklist[[1]] %v% 'vertex.names', 
-               mean_deg = networklist[[1]] %v% 'degree',
-               mean_btw = networklist[[1]] %v% 'betweenness')
-  colnames(df) <- c("person", 
-                     paste(colnames(df)[[2]], 1, sep="_"),
-                     paste(colnames(df)[[3]], 1, sep="_")
-  )
-  
-  for (i in 2:length(networklist)){
-    
-    # loop through all versions and save the data
-    tmp <- networklist[[i]]
-    tib <- tibble(person   = tmp %v% 'vertex.names', 
-                  mean_deg = tmp %v% 'degree',
-                  mean_btw = tmp %v% 'betweenness')
-    colnames(tib) <- c("person", 
-                       paste(colnames(tib)[[2]], i, sep="_"),
-                       paste(colnames(tib)[[3]], i, sep="_")
-    )
-    df <- df %>% full_join(tib, by=c("person"= "person")) 
-  }
-  return(df)
-}
+source("functions_developer_sna.R", echo = F)
 
 # calculate thresholds ---------------------------------------------------------
 
@@ -156,12 +63,14 @@ dv_thresholds <-
             median = median(n),
             threequarters = quantile(n)[4],
             sd = sd(n),
-            mean_std = (mean(n) + sd(n)))
+            mean_std = (mean(n) + sd(n)), 
+            half = quantile(n)[3],
+            firstquarter = quantile(n)[2])
 
-dv_thresholds
+dv_thresholds %>% print(n=Inf)
+dv_thresholds %>% write_csv("thresholds for dv.csv")
 
-
-# dichotomize networks ----------------------------------------------------
+# prep dichotomize networks ----------------------------------------------------
 
 # dichotomize edgelist
 dv_modified <- 
@@ -170,8 +79,10 @@ dv_modified <-
   mutate(tie_mean = if_else(n > mean(n), 1, 0),
          tie_median = if_else(n > median(n), 1, 0),
          tie_three4th = if_else(n > quantile(n)[4], 1, 0),
-         tie_three4th = if_else(n > quantile(n)[4], 1, 0),
-         tie_mean_std = if_else(n > (mean(n) + sd(n)), 1, 0)
+         tie_mean_std = if_else(n > (mean(n) + sd(n)), 1, 0),
+         tie_median2 = if_else(n  >= median(n), 1, 0),
+         tie_half = if_else(n > quantile(n)[3], 1, 0),
+         tie_1st = if_else(n > quantile(n)[2], 1, 0)
          )
 
 # count number of edges per network
@@ -266,6 +177,7 @@ for (i in 1: max(dv_master$ver)){
 # pull out centrality and betweennes and store in a dataset
 df_med <- builddf(networklist = dv_median)
 
+#---
 
 # create the networks with dichotomization = 75th percentile
 #tie_three4th
@@ -280,6 +192,46 @@ for (i in 1: max(dv_master$ver)){
 }
 # pull out centrality and betweennes and store in a dataset
 df_three4 <- builddf(networklist = dv_three4th)
+
+#---
+  
+dv_median2 <- list()
+for (i in 1: max(dv_master$ver)){
+  #print(i)
+  tmp <- cutnetworks("tie_median2", version = i)
+  
+  dv_median2[[i]] <- tmp
+  
+}
+# pull out centrality and betweennes and store in a dataset
+df_median2 <- builddf(networklist = dv_median2)
+
+#---
+#
+
+dv_half <- list()
+for (i in 1: max(dv_master$ver)){
+  #print(i)
+  tmp <- cutnetworks("tie_half", version = i)
+  
+  dv_half[[i]] <- tmp
+  
+}
+# pull out centrality and betweennes and store in a dataset
+df_half <- builddf(networklist = dv_half)
+
+#----
+
+dv_first <- list()
+for (i in 1: max(dv_master$ver)){
+  #print(i)
+  tmp <- cutnetworks("tie_1st", version = i)
+  
+  dv_first[[i]] <- tmp
+  
+}
+# pull out centrality and betweennes and store in a dataset
+df_first <- builddf(networklist = dv_first)
 
 
 # creating df with degree for all datasets --------------------------------
@@ -311,6 +263,7 @@ for (i in 2: ncol(df_original)){
 names(corr_mean) <- colnames_corr
 corr_mean
 
+# ---
 
 # dichotomization = median
 corr_med <- NULL
@@ -327,6 +280,9 @@ for (i in 2: ncol(df_original)){
 names(corr_med) <- colnames_corr
 corr_med
 
+# ---
+# 
+# 
 # dichotomization = 75th percentile
 corr_three4 <- NULL
 for (i in 2: ncol(df_original)){
@@ -342,11 +298,69 @@ for (i in 2: ncol(df_original)){
 names(corr_three4) <- colnames_corr
 corr_three4
 
+# ---
+
+# dichotomize above median
+corr_med2 <- NULL
+for (i in 2: ncol(df_original)){
+  
+  x = pull(df_original[,i])
+  y = pull(df_median2[,i])
+  
+  tmpcor <- cor.test(x, y)$estimate
+  #tmpcor <- cor.test(x, y)$p.value
+  corr_med2 <- c(corr_med2, tmpcor)
+  
+}
+names(corr_med2) <- colnames_corr
+corr_med2
+
+# ---
+
+#dichotomize 50th percentile
+
+corr_half <- NULL
+for (i in 2: ncol(df_original)){
+  
+  x = pull(df_original[,i])
+  y = pull(df_half[,i])
+  
+  tmpcor <- cor.test(x, y)$estimate
+  #tmpcor <- cor.test(x, y)$p.value
+  corr_half <- c(corr_half, tmpcor)
+  
+}
+names(corr_half) <- colnames_corr
+corr_half
+
+# ---
+
+# dichotomize 25th percentile
+
+corr_first <- NULL
+for (i in 2: ncol(df_original)){
+  
+  x = pull(df_original[,i])
+  y = pull(df_first[,i])
+  
+  tmpcor <- cor.test(x, y)$estimate
+  #tmpcor <- cor.test(x, y)$p.value
+  corr_first <- c(corr_first, tmpcor)
+  
+}
+names(corr_first) <- colnames_corr
+corr_first
+
+# ---
+
 # put all the correlations into one dataset
 
 df_correlations <- tibble(mean = corr_mean,
                           med = corr_med,
-                          three4 = corr_three4)
+                          three4 = corr_three4,
+                          med2 = corr_med2,
+                          half = corr_half,
+                          first = corr_first)
 
 df_correlations[, 'index'] <- colnames_corr
 
@@ -379,18 +393,19 @@ max(df_correlations[degindex, 3], na.rm=T) # 0.71
 min(df_correlations[btwindex, 3], na.rm=T) # -0.10
 max(df_correlations[btwindex, 3], na.rm=T) # 0.32
 
-df_cor_lg <- df_correlations %>% pivot_longer(cols = c('mean', 'med', 'three4'),
+df_cor_lg <- df_correlations %>% pivot_longer(cols = c('mean', 'med', 'three4', 'med2', 'half', 'first'),
                                               names_to = 'cutoff',
                                               values_to ='value')
 
 ggplot(df_cor_lg, aes(x = index, y = value, color = cutoff)) + 
-  geom_point() + 
+  geom_point(size = 2) + 
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between dichotomized and valued networks",
-       x = 'version number and SNA metric', y = 'correlation') + 
+       x = 'version number and SNA metric', y = 'correlation',
+       caption = "hardly any difference between below and above median") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
-  ggsave('scatterplot_correlations_network_metrics.png')
+  ggsave('scatterplot_correlations_network_metrics.png', height = 9.72, width = 11.2, units = "in")
 
 
 ggplot(df_cor_lg[!is.na(df_cor_lg$value),], 
@@ -399,9 +414,10 @@ ggplot(df_cor_lg[!is.na(df_cor_lg$value),],
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between dichotomized and valued networks",
-       x = 'version number and SNA metric', y = 'correlation') + 
+       x = 'version number and SNA metric', y = 'correlation'
+       )
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ggsave('boxplot_correlations_network_metrics.png')
+  ggsave('boxplot_correlations_network_metrics.png', height = 9.72, width = 11.2, units = "in")
 
 # testing correlation between networks ------------------------------------
 
@@ -424,6 +440,23 @@ for (i in 2:length(dv_original)){
   tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
   qapresult <- c(qapresult, tmp)
   
+  # caculate qap for above median
+  modified <- dv_median2[[i]]
+  tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
+  qapresult <- c(qapresult, tmp)
+  
+  # caculate qap for 50th percentile
+  modified <- dv_half[[i]]
+  tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
+  qapresult <- c(qapresult, tmp)
+  
+  # caculate qap for 25th percentile
+  modified <- dv_first[[i]]
+  tmp <- summary(qaptest(list(original, modified), gcor, g1=1, g2=2))$test
+  qapresult <- c(qapresult, tmp)
+  
+  
+  
 }
 
 qapresult <- as.data.frame(qapresult)
@@ -431,7 +464,7 @@ qapresult <- as.data.frame(qapresult)
 #                           "version", 
 #                           rep.int(seq(from = 2, to =11, by= 1), times = rep(3, length(c(2:11)))))
 
-qapresult$cutoff <- paste(rep.int(c("mean", "median", "three4th"), times = length(seq(2:11))))
+qapresult$cutoff <- paste(rep.int(c("mean", "median", "three4th", 'med2', 'half', 'first'), times = length(seq(2:11))))
 qapresult$version <- rep.int(seq(from = 2, to =11, by= 1), times = rep(3, length(c(2:11))))
 
 
@@ -482,19 +515,38 @@ for (i in 1:10){
   res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
   qapwithinnet <- c(qapwithinnet, res)
   
+  # calculate qap above median t and t+1
+  tmp1 <- dv_median2[[i]]
+  tmp2 <- dv_median2[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+  
+  # calculate qap 50th percentile network t and t+1
+  tmp1 <- dv_half[[i]]
+  tmp2 <- dv_half[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+  
+  # calculate qap 25th percentile network t and t+1
+  tmp1 <- dv_first[[i]]
+  tmp2 <- dv_first[[i+1]]
+  res <- summary(qaptest(list(tmp1, tmp2), gcor, g1=1, g2=2))$test
+  qapwithinnet <- c(qapwithinnet, res)
+  
 }
 
 qapwithinnet <- as.data.frame(qapwithinnet)
-rownames(qapwithinnet) <- paste(c("original", "mean", "median", "three4th"),
+rownames(qapwithinnet) <- paste(c("original", "mean", "median", "three4th", "above_median", "half", "first"),
                                 rep(c('ver1-2', 'ver2-3', 'ver3-4', 'ver4-5', 'ver5-6',
                             'ver6-7', 'ver7-8', 'ver8-9', 'ver9-10', 'ver10-11'), 
-                            times = rep(4, 10)), 
+                            times = rep(7, 10)), 
                             sep="_")
 
-qapwithinnet$cutoff <- paste(rep.int(c("original","mean", "median", "three4th"), times = length(seq(2:11))))
+qapwithinnet$cutoff <- paste(rep.int(c("original","mean", "median", "three4th", "above_median", "half", "first"),
+                                     times = length(seq(2:11))))
 qapwithinnet$version <- rep(c('ver1-2', 'ver2-3', 'ver3-4', 'ver4-5', 'ver5-6',
                               'ver6-7', 'ver7-8', 'ver8-9', 'ver9-10', 'ver10-11'), 
-                            times = rep(4, 10))
+                            times = rep(7, 10))
 
 ggplot(qapwithinnet, aes(x = version, y = qapwithinnet, color = cutoff)) + 
   geom_point() + 

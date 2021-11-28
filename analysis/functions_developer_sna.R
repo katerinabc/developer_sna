@@ -1,4 +1,89 @@
 # functions
+# 
+# 
+
+# for dichotomize network -------------------------------------------------
+
+cutnetworks <- function(thresholdname, version) {
+  # this function dichotomizes the networks 
+  
+  # set columns we need to use
+  colnumbers <- match(c("author", "folder_owner", "ver", thresholdname), 
+                      colnames(dv_modified))
+  
+  # subset the main dataset
+  tmp1 <- dv_modified[dv_modified$ver == version, colnumbers]
+  # remove all edges with no tie (cell value = 0)
+  tmp1 <- tmp1[!tmp1[,4] == 0, ]
+  
+  # create network
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
+  
+  # who is part of the network (existing_dev) and who is missing (missing_dev)
+  existing_dev <- as.vector(igraph::V(g)$name) 
+  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), dv %v% 'vertex.names')]
+  # add the missing developers
+  g <- igraph::add.vertices(g, 
+                            nv = length(missing_dev),
+                            attr = list(name = missing_dev))
+  
+  # sort developers alphabetically --> this step is not working
+  # problem: how to sort a matrix alphabetically --> check standford tutorial
+  # 
+  # transform network into matrix
+  g <- igraph::as_adjacency_matrix(g) # this is not sorted alphabetically
+  
+  # transform matrix into edgelist. It keeps isolates, but removes names
+  #el <- netdiffuseR::adjmat_to_edgelist(g, undirected=FALSE) 
+  
+  mat <- as.matrix(g)
+  #g <- igraph::graph.adjacency(mat)
+  #el <- igraph::as_data_frame(g, what = "both")
+  
+  net <- network(mat, directed=F)
+  
+  # el <- as.edgelist(net, output = "tibble", vnames = "vertex.names") #this removes isolates
+  # as.matrix.network.edgelist(net, as.sna.edgelist=T)
+  # el <- el[sort]
+  # net <- network(el)
+  
+  # calculate network metrics
+  net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman", rescale = TRUE)
+  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected", rescale = TRUE)
+  
+  # return the network
+  return(net)
+}
+
+
+builddf <- function(networklist, df = NULL){
+  # create a dataset with rows as person and network metrics as columns
+  
+  # setup the dataframe with information from version 1
+  df <- tibble(person   = networklist[[1]] %v% 'vertex.names', 
+               mean_deg = networklist[[1]] %v% 'degree',
+               mean_btw = networklist[[1]] %v% 'betweenness')
+  colnames(df) <- c("person", 
+                    paste(colnames(df)[[2]], 1, sep="_"),
+                    paste(colnames(df)[[3]], 1, sep="_")
+  )
+  
+  for (i in 2:length(networklist)){
+    
+    # loop through all versions and save the data
+    tmp <- networklist[[i]]
+    tib <- tibble(person   = tmp %v% 'vertex.names', 
+                  mean_deg = tmp %v% 'degree',
+                  mean_btw = tmp %v% 'betweenness')
+    colnames(tib) <- c("person", 
+                       paste(colnames(tib)[[2]], i, sep="_"),
+                       paste(colnames(tib)[[3]], i, sep="_")
+    )
+    df <- df %>% full_join(tib, by=c("person"= "person")) 
+  }
+  return(df)
+}
+
 
 # function to get network data for one software version -------------------
 
