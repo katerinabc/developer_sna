@@ -4,17 +4,12 @@ rm(list=ls())
 # project owner: Mahdi
 # 
 # created: 04 November 2021
-# updated: 15 November 2021
+# updated: 30 November 2021
 # 
 # 
 # debugging
-# degree values in dv_original are different to degree values in dv_mean, 
-# dv_median
-# 
-# degree values in dv_mean are the same than in dv_median
-# 
-# 
-# TODO try qap with tie = 1 if edge value >= median(edge value), 50th percentile, 25th percentile
+
+# TODO edge count, density, and triad count for each version for cutoff = 50th percentile
 
 # Explanation of workflow using "dichotomize using the mean"
 # as the basis
@@ -33,6 +28,9 @@ rm(list=ls())
 # columns as SNA metrics
 # 
 # 4. calculate correlations
+# 
+# 
+# DICHOTOMIZE
 
 # packages ----------------------------------------------------------------
 
@@ -237,9 +235,10 @@ df_first <- builddf(networklist = dv_first)
 # creating df with degree for all datasets --------------------------------
 
 # create vector for column names
-colnames_corr <- paste("ver", 
-                       sort(rep(seq(1:11),2)),
-                       rep(c("deg", "bet"), 11), sep="")
+colnames_corr <- paste(rep(c("deg", "deg", "bet", "bet"), 11), 
+                       rep(c("est", "pval"), 22), 
+                       sort(rep(seq(1:11),4)),
+                       sep="_")
 
 # calculate the correlations
 # 
@@ -257,7 +256,7 @@ for (i in 2: ncol(df_original)){
   tmpcor <- cor.test(x, y)
   #summary(tmpcor)
   
-  corr_mean <- c(corr_mean, tmpcor$estimate)
+  corr_mean <- c(corr_mean, tmpcor$estimate, tmpcor$p.value)
 
 }
 names(corr_mean) <- colnames_corr
@@ -272,9 +271,9 @@ for (i in 2: ncol(df_original)){
   x = pull(df_original[,i])
   y = pull(df_med[,i])
   
-  tmpcor <- cor.test(x, y)$estimate
+  tmpcor <- cor.test(x, y)
   #tmpcor <- cor.test(x, y)$p.value
-  corr_med <- c(corr_med, tmpcor)
+  corr_med <- c(corr_med, tmpcor$estimate, tmpcor$p.value)
   
 }
 names(corr_med) <- colnames_corr
@@ -290,9 +289,9 @@ for (i in 2: ncol(df_original)){
   x = pull(df_original[,i])
   y = pull(df_three4[,i])
   
-  tmpcor <- cor.test(x, y)$estimate
+  tmpcor <- cor.test(x, y)
   #tmpcor <- cor.test(x, y)$p.value
-  corr_three4 <- c(corr_three4, tmpcor)
+  corr_three4 <- c(corr_three4, tmpcor$estimate, tmpcor$p.value)
   
 }
 names(corr_three4) <- colnames_corr
@@ -307,9 +306,9 @@ for (i in 2: ncol(df_original)){
   x = pull(df_original[,i])
   y = pull(df_median2[,i])
   
-  tmpcor <- cor.test(x, y)$estimate
+  tmpcor <- cor.test(x, y)
   #tmpcor <- cor.test(x, y)$p.value
-  corr_med2 <- c(corr_med2, tmpcor)
+  corr_med2 <- c(corr_med2, tmpcor$estimate, tmpcor$p.value)
   
 }
 names(corr_med2) <- colnames_corr
@@ -325,9 +324,9 @@ for (i in 2: ncol(df_original)){
   x = pull(df_original[,i])
   y = pull(df_half[,i])
   
-  tmpcor <- cor.test(x, y)$estimate
+  tmpcor <- cor.test(x, y)
   #tmpcor <- cor.test(x, y)$p.value
-  corr_half <- c(corr_half, tmpcor)
+  corr_half <- c(corr_half, tmpcor$estimate, tmpcor$p.value)
   
 }
 names(corr_half) <- colnames_corr
@@ -343,9 +342,9 @@ for (i in 2: ncol(df_original)){
   x = pull(df_original[,i])
   y = pull(df_first[,i])
   
-  tmpcor <- cor.test(x, y)$estimate
+  tmpcor <- cor.test(x, y)
   #tmpcor <- cor.test(x, y)$p.value
-  corr_first <- c(corr_first, tmpcor)
+  corr_first <- c(corr_first, tmpcor$estimate, tmpcor$p.value)
   
 }
 names(corr_first) <- colnames_corr
@@ -394,27 +393,78 @@ min(df_correlations[btwindex, 3], na.rm=T) # -0.10
 max(df_correlations[btwindex, 3], na.rm=T) # 0.32
 
 df_cor_lg <- df_correlations %>% pivot_longer(cols = c('mean', 'med', 'three4', 'med2', 'half', 'first'),
-                                              names_to = 'cutoff',
-                                              values_to ='value')
+                                              names_to = c('cutoff'),
+                                              values_to = c('value'))
 
-ggplot(df_cor_lg, aes(x = index, y = value, color = cutoff)) + 
+# df_correlations %>% pivot_longer(cols = index,
+#                                  names_to=type,
+#                                  names_pattern = '(.*)(\\d)')
+#                                  #names_pattern = '(\\w+)_(est)_(\\d)',
+#                                  #values_to = "value"
+#                                  )
+
+df_cor_lg <- df_cor_lg %>% 
+  #mutate(degree = grepl(df_cor_lg$index, "deg"))
+  mutate(type = strsplit(index, "_")) %>%
+  unnest(cols = c(type)) %>% 
+  mutate(version = str_extract(index, "\\d{1,2}")) %>%
+  #filter(type %in% c("est", "pval")) %>%
+  mutate(metric = substr(index, 1, 3)) %>%
+  filter(type %in% c('est', 'pval'))
+
+
+
+estimates <- df_cor_lg %>%
+  mutate(estimate = value) %>%
+  filter(type == "est") %>%
+  select(-index, -value, -type)
+
+pvalue <-   df_cor_lg %>%
+  mutate(pvalue = value) %>%
+  filter(type == "pval") %>%
+  select(-index, -value, -type) %>%
+  add_column(sig = if_else(pvalue$pvalue < 0.05, 1, 0))
+
+df_cor2 <- full_join(estimates, pvalue)
+
+# df_cor2 <- df_cor_lg %>% 
+#   select(-index) %>% 
+#   pivot_wider(id_cols = cutoff,
+#               names_from = type,
+#               values_from=value)
+# 
+#   cols = c('mean', 'med', 'three4', 'med2', 'half', 'first'),
+#                                               names_to = c('cutoff'),
+#                                               values_to = c('value'))
+#                                               
+
+ggplot(df_cor2, aes(x = version, 
+                    y = estimate, 
+                    alpha = sig,
+                    color = cutoff)) + 
   geom_point(size = 2) + 
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between dichotomized and valued networks",
        x = 'version number and SNA metric', y = 'correlation',
-       caption = "hardly any difference between below and above median") + 
+       caption = "Values that are not significant are not shown"
+       ) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
   ggsave('scatterplot_correlations_network_metrics.png', height = 9.72, width = 11.2, units = "in")
 
 
-ggplot(df_cor_lg[!is.na(df_cor_lg$value),], 
-       aes(x = cutoff, y = value, color = cutoff)) + 
-  geom_boxplot() + 
+ggplot(df_cor2, 
+       aes(x = cutoff, 
+           y = estimate, 
+           fill = cutoff,
+           )) + 
+  geom_boxplot() +
+  geom_point(aes(x = cutoff, y = pvalue, color = as.factor(sig))) + 
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
-  labs(title = "Correlation between dichotomized and valued networks",
-       x = 'version number and SNA metric', y = 'correlation'
+  labs(title = "Correlation between dichotomized and valued network metrics",
+       subtitle = "significant pvalues (> 0.05) shown as blue dots",
+       x = 'Network type', y = 'correlation / pvalue'
        )
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   ggsave('boxplot_correlations_network_metrics.png', height = 9.72, width = 11.2, units = "in")
@@ -478,14 +528,14 @@ ggplot(qapresult, aes(x = version, y = qapresult, color = cutoff)) +
   ggsave('scatterplot_correlations_between_network.png')
 
 
-ggplot(qapresult, aes(x = version, y = qapresult, color = cutoff)) + 
+ggplot(qapresult, aes(x = cutoff, y = qapresult, color = cutoff)) + 
   geom_boxplot() + 
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between dichotomized and valued networks",
-       x = 'version number', y = 'correlation') + 
+       x = 'Cut-off values for networks', y = 'QAP correlation') + 
   #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ggsave('boxplot_correlations_between_network.png')
+  ggsave('boxplot_correlations_between_network.png', width = 10, height = 6.82, unit = "in")
 
 # testing correlations within a network -----------------------------------
 
@@ -548,13 +598,13 @@ qapwithinnet$version <- rep(c('ver1-2', 'ver2-3', 'ver3-4', 'ver4-5', 'ver5-6',
                               'ver6-7', 'ver7-8', 'ver8-9', 'ver9-10', 'ver10-11'), 
                             times = rep(7, 10))
 
-ggplot(qapwithinnet, aes(x = version, y = qapwithinnet, color = cutoff)) + 
+ggplot(qapwithinnet, aes(x = cutoff, y = qapwithinnet, color = cutoff)) + 
   geom_point() + 
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation within a network",
        caption = "Correlates ver1 with ver2, ver2 with ver 3 for original network and the 3 types of dichotomzied networks",
-       x = 'version number', y = 'correlation') + 
+       x = 'Network type', y = 'correlation') + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
   ggsave('scatterplot_correlations_within_network.png', width = 10, height = 6.82, unit = "in")
 
@@ -565,6 +615,64 @@ ggplot(qapwithinnet, aes(x = cutoff, y = qapwithinnet, color = cutoff)) +
   theme_minimal() + 
   labs(title = "Correlation within a networks",
        caption = "Correlates ver1 with ver2, ver2 with ver 3 for original network and the 3 types of dichotomzied networks",
-       x = 'version number', y = 'correlation') + 
+       x = 'Cutoff values for networks', y = 'correlation') + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   ggsave('boxplot_correlations_within_network.png', width = 10, height = 6.82, unit = "in")
+
+
+
+# number of edges per version: first ---------------------------------------------
+
+dv_first
+
+nd_first <- networkDynamic(network.list = dv_first,
+                           #onsets = seq(0, 10, 1),
+                           #termini = seq(1, 11, 1),
+                           start = 1, 
+                           end = 11)
+nd_first
+round(tSnaStats(nd_first, snafun = 'gden'),2)
+round(tSnaStats(nd_first, snafun = 'gtrans' ),2)
+#round(tSnaStats(nd_first, snafun = 'degree' ),2)
+tEdgeDensity(nd_first, mode = 'duration')
+# 17% of edges are active at any point of time
+tEdgeFormation(nd_first)
+tEdgeDissolution(nd_first)
+tiedDuration(nd_first, mode = 'duration') # why are some 0? 
+#nd_first_compressed <- timeProjectedNetwork(nd_first)
+#plot(timeProjectedNetwork(nd_first), label = 'vertex.names')
+
+ndtv::filmstrip(nd_first,displaylabels=FALSE, 
+                slice.par = list(start = 1, 
+                                 end = 11,
+                                 interval = 1,
+                                 aggregate.dur = 1,
+                                 rule = 'latest'))
+
+# number of edges per version: half ---------------------------------------------
+
+dv_half
+
+nd_half <- networkDynamic(network.list = dv_half,
+                           #onsets = seq(0, 10, 1),
+                           #termini = seq(1, 11, 1),
+                           start = 1, 
+                           end = 11)
+nd_half
+round(tSnaStats(nd_half, snafun = 'gden'),2)
+round(tSnaStats(nd_half, snafun = 'gtrans' ),2)
+#round(tSnaStats(nd_half, snafun = 'degree' ),2)
+tEdgeDensity(nd_half, mode = 'duration')
+# 17% of edges are active at any point of time
+tEdgeFormation(nd_half)
+tEdgeDissolution(nd_half)
+tiedDuration(nd_half, mode = 'duration') # why are some 0? 
+#nd_first_compressed <- timeProjectedNetwork(nd_half)
+#plot(timeProjectedNetwork(nd_half), label = 'vertex.names')
+
+ndtv::filmstrip(nd_half,displaylabels=FALSE, 
+                slice.par = list(start = 1, 
+                                 end = 11,
+                                 interval = 1,
+                                 aggregate.dur = 1,
+                                 rule = 'latest'))

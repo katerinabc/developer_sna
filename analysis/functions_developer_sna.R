@@ -4,6 +4,78 @@
 
 # for dichotomize network -------------------------------------------------
 
+dynmatric <- function(thresholdname, ver, data, x = "author", y = "folder_owner") {
+  # this function dichotomizes the networks 
+  
+  # set columns we need to use
+  colnumbers <- match(c(x, y, "ver", thresholdname), 
+                      colnames(data))
+  
+  # subset the main dataset
+  tmp1 <- data[data$ver == ver, colnumbers]
+  # remove all edges with no tie (cell value = 0)
+  tmp1 <- tmp1[!tmp1[,4] == 0, ]
+  
+  # create network
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
+  
+  # who is part of the network (existing_dev) and who is missing (missing_dev)
+  existing_dev <- as.vector(igraph::V(g)$name) 
+  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), as.vector(unique(ivatt_master2$author)))]
+  # add the missing developers
+  g <- igraph::add.vertices(g, 
+                            nv = length(missing_dev),
+                            attr = list(name = missing_dev))
+  
+  # transform network into matrix
+  g <- igraph::as_adjacency_matrix(g) # this is not sorted alphabetically
+  
+  # sort alphabetically
+  mat <- as.matrix(g)
+  mat <- mat[sort(row.names(x = mat)), sort(colnames(x = mat))]
+  
+  # return the network
+  return(mat)
+}
+
+netpanel <- function(thresholdname, ver, data, x = "author", y = "folder_owner") {
+  # this function dichotomizes the networks 
+  
+  # set columns we need to use
+  colnumbers <- match(c(x, y, "ver", thresholdname), 
+                      colnames(data))
+  
+  # subset the main dataset
+  tmp1 <- data[data$ver == ver, colnumbers]
+  # remove all edges with no tie (cell value = 0)
+  tmp1 <- tmp1[!tmp1[,4] == 0, ]
+  
+  # create network
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
+  
+  # who is part of the network (existing_dev) and who is missing (missing_dev)
+  existing_dev <- as.vector(igraph::V(g)$name) 
+  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), as.vector(unique(ivatt_master2$author)))]
+  # add the missing developers
+  g <- igraph::add.vertices(g, 
+                            nv = length(missing_dev),
+                            attr = list(name = missing_dev))
+  
+  # transform network into matrix
+  g <- igraph::as_adjacency_matrix(g) # this is not sorted alphabetically
+  
+  # sort alphabetically
+  mat <- as.matrix(g)
+  mat <- mat[sort(row.names(x = mat)), sort(colnames(x = mat))]
+  
+  net <- network(mat, directed=F)
+  
+  
+  # return the network
+  return(net)
+}
+
+
 cutnetworks <- function(thresholdname, version) {
   # this function dichotomizes the networks 
   
@@ -21,7 +93,7 @@ cutnetworks <- function(thresholdname, version) {
   
   # who is part of the network (existing_dev) and who is missing (missing_dev)
   existing_dev <- as.vector(igraph::V(g)$name) 
-  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), dv %v% 'vertex.names')]
+  missing_dev <- all_developers[-match(as.vector(igraph::V(g)$name), as.vector(unique(ivatt_master2$author)))]
   # add the missing developers
   g <- igraph::add.vertices(g, 
                             nv = length(missing_dev),
@@ -37,6 +109,7 @@ cutnetworks <- function(thresholdname, version) {
   #el <- netdiffuseR::adjmat_to_edgelist(g, undirected=FALSE) 
   
   mat <- as.matrix(g)
+  mat <- mat[sort(row.names(x = mat)), sort(colnames(x = mat))]
   #g <- igraph::graph.adjacency(mat)
   #el <- igraph::as_data_frame(g, what = "both")
   
@@ -54,6 +127,7 @@ cutnetworks <- function(thresholdname, version) {
   # return the network
   return(net)
 }
+
 
 
 builddf <- function(networklist, df = NULL){
