@@ -1,3 +1,5 @@
+rm(list = ls()) # clean everything
+
 # packages ----------------------------------------------------------------
 
 library(readr)
@@ -18,7 +20,12 @@ ivatt_master <- unique(ivatt_master2[,-c(1:2, 8)])
 
 names(dv_master)
 dv_master
-dv <- network(dv_master[,-3], directed=FALSE, ignore.eval=F, names.eval='weights', matrix.type = 'edgelist')
+dv_master <- dv_master %>% filter(! author == folder_owner)
+dv <- network(dv_master[,-3], 
+              directed=TRUE, 
+              loops = FALSE,
+              multiple = FALSE,
+              ignore.eval=F, names.eval='weights', matrix.type = 'edgelist')
 
 
 # ivnet_master needs to be summarized to show how often a link exists between two folder owners

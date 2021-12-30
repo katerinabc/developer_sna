@@ -68,18 +68,18 @@ source("creating_networks.R", echo = F)
 
 # uncomment everything until 'descriptive analysis if you have problems
 # loading the RData file and need to create the data objects
-# ivatt_master2 <- read_csv("authatt.csv")
-# ivatt_master2 <- ivatt_master2[,-c(1:2)]
-# all_developers <- as.vector(unique(ivatt_master2$author))
-# 
-# ivatt_master <- unique(ivatt_master2 %>% select(-ver2))
-# ivnet_master <- read_csv("crequired_el.csv")
-# # columnn names information
-# # time = version
-# # sum_weights = sum of edges between dev.x and dev.y for each version
-# # n = sum of weights
-# # weights = number of connections between two files
-# 
+ivatt_master2 <- read_csv("authatt.csv")
+ivatt_master2 <- ivatt_master2[,-c(1:2)]
+all_developers <- as.vector(unique(ivatt_master2$author))
+
+ivatt_master <- unique(ivatt_master2 %>% select(-ver2))
+ivnet_master <- read_csv("crequired_el.csv")
+# columnn names information
+# time = version
+# sum_weights = sum of edges between dev.x and dev.y for each version
+# n = sum of weights
+# weights = number of connections between two files
+
 # #  IV (technical dependencies) --------------------------------------------
 # 
 # # colnames in iv not the same than in dv. fix for code to work
@@ -99,15 +99,13 @@ for (i in 1: max(iv_modified$ver)){
                   y = "folder_owner.y",
                   data = iv_modified)
 
-
-
   iv_first[[i]] <- tmp
 
 }
 
 
 iv_g <- lapply(iv_first, function(x) 
-  network(x, directed=F))
+  network(x, directed=T))
 
 ivdyn <- networkDynamic(network.list = iv_g,
                         #onsets = seq(0, 10, 1),
@@ -119,82 +117,82 @@ ivdyn
 
 # 
 # 
-# # prep DV network ---------------------------------------------------------
-# 
-# 
-# 
-# dv_modified <- 
-#   dv_master %>% 
-#   group_by(ver) %>% 
-#   mutate(tie_first = if_else(n > quantile(n)[2], 1, 0)
-#   )
-# 
-# dv_first <- list()
-# for (i in 1: max(dv_master$ver)){
-#   #print(i)
-#   tmp <- netpanel(thresholdname = "tie_first", 
-#                   ver = i, x = "author", y = "folder_owner", 
-#                   data = dv_modified)
-#   
-#   dv_first[[i]] <- tmp
-#   
-# }
-# 
-# for (i in 1:length(dv_first)){
-#   set.edge.value(dv_first[[i]], 'required_comm', value = iv_first[[i]])
-#   # the edge values are only set for active edges 
-# }
-# 
-# 
-# 
-# # add developer information -----------------------------------------------
-# 
-# 
-# # add network attributes
-# 
-# # in the following loop information for developers who are members of version 2 is stored in a 
-# # number of temporary files (all beginning with tmp_).
-# # If a developer is not member of the version the number 99 is added. 
-# #participants <- NULL
-# 
-# for (i in 1:11){
-#   jobtitle <- NULL
-#   location <- NULL
-#   contract <- NULL
-#   member <- NULL 
-#   print(i)
-#   for (j in network::get.vertex.attribute(dv_first[[i]], 'vertex.names')){
-#  # print(j)
-#   
-#   atmp <- as.vector(unique(ivatt_master2[ivatt_master2$author == j & 
-#                                   ivatt_master2$ver2 == i, 
-#                                 3:5]))
-#   if (nrow(atmp) == 0) {atmp <- tibble(jobtitle_raw = NA, 
-#                                        location = NA, 
-#                                        contract = NA)}
-#   #print(atmp)
-#   jobtitle <- c(jobtitle, pull(atmp[1]))
-#   print( jobtitle)
-#   location <- c(location, pull(atmp[2]))
-#   print(location)
-#   contract <- c(contract, pull(atmp[3]))
-#   print(contract)
-#   
-#   memtmp <- if_else(j %in% pull(ivatt_master2[ivatt_master2$ver2 == i, 1]), 1, 0)
-#     
-#   member <- c(member, memtmp)
-#   
-#   }
-#   network::set.vertex.attribute(dv_first[[i]], 'jobtitle', as.numeric(jobtitle))
-#   network::set.vertex.attribute(dv_first[[i]], 'location', as.numeric(location))
-#   network::set.vertex.attribute(dv_first[[i]], 'contract', as.numeric(contract))
-#   network::set.vertex.attribute(dv_first[[i]], 'membership', as.numeric(member))
-# 
-# }
-# # a note on membership
-# # a 0 in membership means they did not join this project
-# # people in version 1 work on version 2
-# 
+# prep DV network ---------------------------------------------------------
+
+
+
+dv_modified <-
+  dv_master %>%
+  group_by(ver) %>%
+  mutate(tie_first = if_else(n > quantile(n)[2], 1, 0)
+  )
+
+dv_first <- list()
+for (i in 1: max(dv_master$ver)){
+  #print(i)
+  tmp <- netpanel(thresholdname = "tie_first",
+                  ver = i, x = "author", y = "folder_owner",
+                  data = dv_modified)
+
+  dv_first[[i]] <- tmp
+
+}
+
+for (i in 1:length(dv_first)){
+  set.edge.value(dv_first[[i]], 'required_comm', value = iv_first[[i]])
+  # the edge values are only set for active edges
+}
+
+
+
+# add developer information -----------------------------------------------
+
+
+# add network attributes
+
+# in the following loop information for developers who are members of version 2 is stored in a
+# number of temporary files (all beginning with tmp_).
+# If a developer is not member of the version the number 99 is added.
+#participants <- NULL
+
+for (i in 1:11){
+  jobtitle <- NULL
+  location <- NULL
+  contract <- NULL
+  member <- NULL
+  print(i)
+  for (j in network::get.vertex.attribute(dv_first[[i]], 'vertex.names')){
+ # print(j)
+
+  atmp <- as.vector(unique(ivatt_master2[ivatt_master2$author == j &
+                                  ivatt_master2$ver2 == i,
+                                3:5]))
+  if (nrow(atmp) == 0) {atmp <- tibble(jobtitle_raw = NA,
+                                       location = NA,
+                                       contract = NA)}
+  #print(atmp)
+  jobtitle <- c(jobtitle, pull(atmp[1]))
+  print( jobtitle)
+  location <- c(location, pull(atmp[2]))
+  print(location)
+  contract <- c(contract, pull(atmp[3]))
+  print(contract)
+
+  memtmp <- if_else(j %in% pull(ivatt_master2[ivatt_master2$ver2 == i, 1]), 1, 0)
+
+  member <- c(member, memtmp)
+
+  }
+  network::set.vertex.attribute(dv_first[[i]], 'jobtitle', as.numeric(jobtitle))
+  network::set.vertex.attribute(dv_first[[i]], 'location', as.numeric(location))
+  network::set.vertex.attribute(dv_first[[i]], 'contract', as.numeric(contract))
+  network::set.vertex.attribute(dv_first[[i]], 'membership', as.numeric(member))
+
+}
+# a note on membership
+# a 0 in membership means they did not join this project
+# people in version 1 work on version 2
+
 # # add cumulative familiarity ----------------------------------------------
 # 
 # # do this later
@@ -285,6 +283,9 @@ m1 <- tergm(netdyn ~
 mcmc.diagnostics(m1)
 summary(m1)
 
-t# degree 1 tests if ties are more likely to form/dissolve when 
+# degree 1 tests if ties are more likely to form/dissolve when 
 # developers have 1 degree (are not isolates); this tests a tendency against
 # isolates
+# 
+# 
+# 

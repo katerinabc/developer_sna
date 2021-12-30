@@ -17,7 +17,7 @@ dynmatric <- function(thresholdname, ver, data, x = "author", y = "folder_owner"
   tmp1 <- tmp1[!tmp1[,4] == 0, ]
   
   # create network
-  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=TRUE) # here something goes wrong
   
   # who is part of the network (existing_dev) and who is missing (missing_dev)
   existing_dev <- as.vector(igraph::V(g)$name) 
@@ -38,7 +38,8 @@ dynmatric <- function(thresholdname, ver, data, x = "author", y = "folder_owner"
   return(mat)
 }
 
-netpanel <- function(thresholdname, ver, data, x = "author", y = "folder_owner") {
+netpanel <- function(thresholdname, ver, data, x = "author", y = "folder_owner",
+                     mode_directed= TRUE, as_network = TRUE) {
   # this function dichotomizes the networks 
   
   # set columns we need to use
@@ -48,10 +49,12 @@ netpanel <- function(thresholdname, ver, data, x = "author", y = "folder_owner")
   # subset the main dataset
   tmp1 <- data[data$ver == ver, colnumbers]
   # remove all edges with no tie (cell value = 0)
-  tmp1 <- tmp1[!tmp1[,4] == 0, ]
+  #tmp1 <- tmp1[!tmp1[,4] == 0, ]
+  # remove loops
+  tmp1 <- tmp1[!tmp1[,1] == tmp1[,2], ] 
   
   # create network
-  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=mode_directed) # here something goes wrong
   
   # who is part of the network (existing_dev) and who is missing (missing_dev)
   existing_dev <- as.vector(igraph::V(g)$name) 
@@ -68,11 +71,11 @@ netpanel <- function(thresholdname, ver, data, x = "author", y = "folder_owner")
   mat <- as.matrix(g)
   mat <- mat[sort(row.names(x = mat)), sort(colnames(x = mat))]
   
-  net <- network(mat, directed=F)
-  
-  
+  if(as_network == TRUE){
+  net <- network(mat, directed=mode_directed)
   # return the network
-  return(net)
+  return(net)}
+  else {return(mat)}
 }
 
 
@@ -89,7 +92,7 @@ cutnetworks <- function(thresholdname, version) {
   tmp1 <- tmp1[!tmp1[,4] == 0, ]
   
   # create network
-  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=FALSE) # here something goes wrong
+  g <- igraph::graph_from_data_frame(tmp1[,-3], directed=TRUE) # here something goes wrong
   
   # who is part of the network (existing_dev) and who is missing (missing_dev)
   existing_dev <- as.vector(igraph::V(g)$name) 
@@ -113,7 +116,7 @@ cutnetworks <- function(thresholdname, version) {
   #g <- igraph::graph.adjacency(mat)
   #el <- igraph::as_data_frame(g, what = "both")
   
-  net <- network(mat, directed=F)
+  net <- network(mat, directed=TRUE)
   
   # el <- as.edgelist(net, output = "tibble", vnames = "vertex.names") #this removes isolates
   # as.matrix.network.edgelist(net, as.sna.edgelist=T)
@@ -136,11 +139,13 @@ builddf <- function(networklist, df = NULL){
   # setup the dataframe with information from version 1
   df <- tibble(person   = networklist[[1]] %v% 'vertex.names', 
                mean_deg = networklist[[1]] %v% 'degree',
-               mean_btw = networklist[[1]] %v% 'betweenness')
+               #mean_btw = networklist[[1]] %v% 'betweenness'
+               )
   colnames(df) <- c("person", 
-                    paste(colnames(df)[[2]], 1, sep="_"),
-                    paste(colnames(df)[[3]], 1, sep="_")
-  )
+                    paste(colnames(df)[[2]], 1, sep="_")
+                    #paste(colnames(df)[[3]], 1, sep="_"
+                    )
+  
   
   for (i in 2:length(networklist)){
     
@@ -148,11 +153,13 @@ builddf <- function(networklist, df = NULL){
     tmp <- networklist[[i]]
     tib <- tibble(person   = tmp %v% 'vertex.names', 
                   mean_deg = tmp %v% 'degree',
-                  mean_btw = tmp %v% 'betweenness')
+                  #mean_btw = tmp %v% 'betweenness'
+                  )
     colnames(tib) <- c("person", 
-                       paste(colnames(tib)[[2]], i, sep="_"),
-                       paste(colnames(tib)[[3]], i, sep="_")
-    )
+                       paste(colnames(tib)[[2]], i, sep="_")
+                       #paste(colnames(tib)[[3]], i, sep="_"
+                             )
+    
     df <- df %>% full_join(tib, by=c("person"= "person")) 
   }
   return(df)

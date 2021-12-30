@@ -10,8 +10,10 @@ source('data_import.R', echo=T)
 # Create dataset own. This dataset describes ownership of folders based on when they were first
 # created. 
 # I included files that were created (action == A) and those who were modified (action = M). 
-# I did this, as several files, when they first appeared in DF had as action Modified. When removing
-# duplicates, the first entry is always kept. This means files that were first created and then 
+# I did this, as several files, when they first appeared in DF had as action Modified. 
+# 
+# When removing duplicates, the first entry is always kept. 
+# This means files that were first created and then 
 # modified, the first entry (thus when they were created) is kept. 
 # using the shorter filename (column 40), author (column 1). column 39 contains ID rev.
 # ID rev is needed to make sure that the files are sorted properly. 
@@ -113,6 +115,16 @@ for (i in 1:nrow(DF)){
 
 DF$folder_owner <- folder_owner
 
+
+DF_master <- DF
+DF <- DF_master %>% select(ver, author, action,Date, folder_names:members)
+
+DF %>% group_by(ver, folder_names, members) %>% count()
+DF %>% group_by(ver) %>% mutate(rows = n()) %>%
+  group_by(ver,  members, rows) %>% count() %>%
+  pivot_wider(id_cols=c(ver, rows), 
+              names_from = members, values_from = n)
+
 # solving the errors
 # some files are not assigned an owner (folder owner == error). This is because the file was not
 # created but modified even thought it was the first time it appeared. 
@@ -127,7 +139,7 @@ members_vec <- NULL
 for (i in 1:nrow(DF)){
   tmp_owner <- DF[i, 43] # stores the name of the owner
   tmp_version <- DF[i, 6] # stores the version number
-  if(tmp_owner %in% authatt[authatt$ver == tmp_version,2]){ 
+  if(tmp_owner %in% authatt[authatt$ver2 == tmp_version,2]){ 
     # creates a logical vector (TRUE/FALSE) if an author is member in a version
     tmp_member <- TRUE
   }
@@ -159,7 +171,11 @@ ggsave("onwership_frequency_all_versions.png")
 # I will improve graph if needed. 
 
 library(dplyr)
-contr_now <- DF %>% group_by(ver, folder_names, author) %>% summarize(contribution = n())
+# counts per version, folder how often a developer makes a contributiobn 
+contr_now <- DF %>% 
+  group_by(ver, folder_names, author) %>% 
+  summarize(contribution = n())
+
 ggplot(contr_now, aes(contribution)) + geom_bar()
 contr_now_mod <- contr_now[-contr_now$contribution == 0,]
 #ggplot(contr_now_mod, aes(author, folder_names, fill = contribution)) + geom_tile() # too many variables
@@ -169,7 +185,8 @@ contr_now_mod <- contr_now[-contr_now$contribution == 0,]
 # At this point DF contains the authors (those who created or modified a file), 
 # the folder names, and the folder owners (based on who first created a folder).
 # 
-# Folder ownership has been so far assigned based on who first created a folder. This ownership has been 
+# Folder ownership has been so far assigned based on who first created a folder. 
+# This ownership has been 
 # applied to all folders regardless if the developer is a member of the version. 
 # Now we need to change the folder owners for those who left the project.
 # Gaining Ownership if the owner left is based on contribution to folders.
@@ -191,30 +208,131 @@ table(DF$folder_owner, DF$members) # how often has a developer be assigned to a 
 
 # CREATE A LOOK UP TABLE
 # This is creating a lookup table with the following information: 
-# group DF by version number, then folder names, and then developer and add a column with info about
+# group DF by version number, then folder names, and then developer and 
+# add a column with info about
 # how often the developer made a contribution to a specific folder in a specific version.
-contr_now <- DF %>% group_by(ver, folder_names, author) %>% summarize(contribution = n())
+contr_now <- DF %>% 
+  group_by(ver, folder_names, author, folder_owner) %>% 
+  summarize(contribution = n())
 
-# transform the tiddy table created in the previous line into a data frame and keep only those developers who made the 
+# transform the tiddy table created in the previous line into a data frame and 
+# keep only those developers who made the 
 # highest contribution to a folder in a version.
-# in top_n, 1 means to return only 1 row. As 1 is positive it returns the row with the highest value
-# in top_n, the second argument telsl R how to sort the column. 
-top_contr_now <- contr_now %>%group_by(ver, folder_names) %>% top_n(1, contribution)
+
+# filter contr_now so that people who made a contribution but are not part of the
+# project team are excluded
+# create a logical vector indicating if the folder owner is member in the project version
+
+
+# use the new version numbering!!!
+members_vec2 <- NULL
+for (i in 1:nrow(contr_now)){
+#for (i in c(1, 4:10, 100, 432, 567, 1021)){
+  # stores the name of the owner
+  tmp_owner <- contr_now[i, 
+                         which(names(contr_now)=='folder_owner')] 
+  
+  # stores the version number
+  tmp_version <- contr_now[i, 
+                           which(names(contr_now)=='ver')]
+  # creates a logical vector (TRUE/FALSE) if an author is 
+  # member in a version
+  # print(tmp_owner)
+  # print(authatt[authatt$ver2 == pull(tmp_version),
+  #               which(names(authatt)=='author')])
+  if(tmp_owner %in% authatt[authatt$ver2 == pull(tmp_version),
+                            which(names(authatt)=='author')]){ 
+    
+    tmp_member <- TRUE
+  }
+  else{
+    tmp_member <- FALSE
+  }
+  #print(tmp_member)
+  members_vec2 <- c(members_vec2, tmp_member)
+}
+
+contr_now$members <- members_vec2 # adds the logical vector to DF. 
+
+# false ownership per developer
+contr_now %>% group_by(ver, folder_owner, members) %>% tally() %>%
+  pivot_wider(id_cols = c(ver, folder_owner), 
+              names_from = members, values_from = n)
+
+# false ownership per version
+contr_now %>% group_by(ver) %>% mutate(rows = n()) %>%
+  group_by(ver, rows, members) %>% count() %>%
+  pivot_wider(id_cols = c(ver, rows), 
+              names_from = members, values_from = n)
+
+contr_now %>% group_by(ver, folder_owner) %>% 
+  filter(members == TRUE) %>% 
+  summarize(max_contribution = sum(contribution)) %>% write_csv('top_contribution_by_owner_per_version.csv') 
+
+contr_now %>% group_by(ver, folder_owner) %>% 
+  filter(members == FALSE) %>% 
+  summarize(max_contribution = sum(contribution)) %>%
+  write_csv('max_contribution_byonwer_NOT_a_member_per_version.csv') 
+
+contr_now %>% group_by(ver, folder_owner) %>% 
+  filter(members == FALSE) %>% 
+  summarize(max_contribution = sum(contribution)) %>% 
+  top_n(1, max_contribution)
+  write_csv('top_contribution_byonwer_NOT_a_member_per_version.csv') 
+
+
+# top_contr_now_ver <- contr_now %>% group_by(ver, folder_names) %>% top_n(1, contribution)
+# top_contr_now_ver %>% filter(members == FALSE)
+# # 1034 times a folder owner is assigned who is not a member of the project
+# 
+# top_contr_now_ver <- top_contr_now_ver %>% filter(members == TRUE)
+# top_contr_now <- top_contr_now_ver %>% 
+#   group_by(ver, folder_names) %>% top_n(1, contribution)
+# # if we use top_contr_now_ver all folder owners are part of the project
+# # but do all folders have a new owner??
+# 
+# # in top_n, 1 means to return only 1 row. As 1 is positive it returns the row with the highest value
+# # in top_n, the second argument tells R how to sort the column. 
+# # 
+# top_contr_now <- contr_now %>%group_by(ver, folder_names) %>% top_n(1, contribution)
+
+# MODIFICATION TO THE CODE IMPLEMENTED ON 19TH DECEMBER 2021
+# filter contr-now to only show developers who are project members
+# subsequently filter to only show top contributions
+# why: before we had newly assigned folder owners who were not project members, but 
+# made the highest contribution to the folder
+
+# the members column checks if the developer is a project member
+# 
+
+# get top contributors per version and folder but limit it to 
+# developers who are project members
+top_contr_now_ver <- 
+  contr_now %>% 
+  filter(members == TRUE) %>%
+  group_by(ver, folder_names) %>% top_n(1, contribution)
+
+# reassign to a different object used further down
+top_contr_now <- top_contr_now_ver
+
+
 
 # creating an index with row numbers of those developers who are not a member in 
 # version x but owner of a folder that has been modified in version x
 idx_nonmembers <- which(DF$members == FALSE)
 
 
-# copy the folder owner names. These will be overwritten if the folder owner is not part of a version
+# copy the folder owner names into a new column. 
+# These will be overwritten if the folder owner is not part of a version
 DF$new_owner <- DF$folder_owner
 
-#subset DF by those who developers who are not a member in a given version but owner of a folder
+# subset DF by developers who are not a member in a given version 
+# but owner of a folder 
 # not sure this is used further down
-nonmembers <- DF[idx_nonmembers, c(1:3,42:45)] # this was first folder 4
+nonmembers <- DF_master[idx_nonmembers,] # this was first folder 4
 
-# take care: if A makes highest contribution to folder XYZ, this ownership is transfered to the folders
-#  across all version
+# take care: if A makes highest contribution to folder XYZ,
+# this ownership is transfered to the folders across all version
  
 # Assigning new folder owners. This will be done per version
 # 
@@ -227,46 +345,68 @@ nonmembers <- DF[idx_nonmembers, c(1:3,42:45)] # this was first folder 4
 # For every i, get the version number (column 6), folder name (column 42)
 # Subset 1: Get all developers who contributed to tmp_folder using the lookup table
 # top_contr_now. Store this in tmp_contributors
-# Subset 2: Subset the data file tmp_contributors to only get the developers who 
+# Subset 2: Subset tmp_contributors to only get the developers who 
 # contributed to tmp_version. Then, pick the first one with the 
-# highest amount of contributions. Assign this name to 'new owner' (column 45 in DF)
+# highest amount of contributions. 
+# Assign this name to 'new owner' (column 45 in DF)
 
 sink("new_owner_test.txt") #sink writes the output to a text file for inspection
 # used to test the loop. Commented out once code is working
 
+counter <- NULL
 a <- 1 # a is a placeholder to sequence over idx_nonmembers
   while(DF[idx_nonmembers[a],6] < 7){
     i <- idx_nonmembers[a]
-    tmp_version <- DF[i, 6] # store the version 
-    print(paste("Version: ", tmp_version, "index:", i )) # checking if it works
-    tmp_folder <- DF[i, 42] # store the folder name
-    # 
+    # store the version 
+    tmp_version <- DF[i, which(names(DF) == 'ver')] 
+
+    
+    # store the folder name
+    tmp_folder <- DF[i, which(names(DF) == "folder_names")] 
+     
     # get all rows with tmp_folder before version 7
     tmp_idx <- which(DF$folder_names == tmp_folder & DF$ver < 7)
+    
     # subset rows by only taken those at or after i
     # i is in the row number index in DF.
-    tmp_idx <- tmp_idx[which(tmp_idx >= i)] # error ???
+    tmp_idx <- tmp_idx[which(tmp_idx >= i)] 
     
     # find the top contributor for tmp_folder in version tmp_version
-    tmp_contributors <- top_contr_now[top_contr_now$ver == tmp_version,]
-    tmp_contributors <- tmp_contributors[tmp_contributors$folder_names == tmp_folder,] # Subset 1
-    tmp_folder_contributor <- tmp_contributors[ # Subset 2
-      tmp_contributors$ver == tmp_version,3][[1]][1] # pick first developer when 2 tie in contribution
+    tmp_contributors <- top_contr_now[top_contr_now$folder_names == tmp_folder,] # Subset 1
+    tmp_contributors <- tmp_contributors[tmp_contributors$ver == tmp_version,]
     
-    # assign top contributors to all tmp_folder instances after i
-    DF[tmp_idx,45] <- tmp_folder_contributor
+    
+    # print(paste("Version: ", tmp_version,
+    #             "index:", i, 
+    #             'folder: ', tmp_folder, 
+    #             'top contributors:',  tmp_contributors)) # checking if it works
+    # 
+    tmp <- dim(tmp_contributors)[1] !=  0
+    counter <- c(counter, tmp)
+    
+    if(dim(tmp_contributors)[1] !=  0){
+      tmp_folder_contributor <- tmp_contributors[ # Subset 2
+        tmp_contributors$ver == tmp_version,3][[1]][1] # pick first developer when 2 tie in contribution
+      
+      # assign top contributors to all tmp_folder instances at or after i
+      DF[tmp_idx,45] <- tmp_folder_contributor
+    } # if tmp_contributors  == 0, do nothing and do the next loop
+    
     a = a+1
     # 26/09/2019: this loop works. only error is andrea.rana making a change to 
     # id_rev 38960. small bug fix. delete this row.
+    # 
+    
   }
 
 # delete from idx_nonmebers all index for version 4 to version 6 as
-# folder ownership in version 7 needs to reflect ownership in version 1-3
-idx_nonmembers_branche2 <- which(DF$members == FALSE & ( DF$ver < 4 | DF$ver > 6) )
+# folder ownership in version 7 needs to reflect ownership in version 1-2
+idx_nonmembers_branche2 <- which(DF$members == FALSE & ( DF$ver < 3 | DF$ver > 6) )
 
 # the next loop first re-runs folder ownership for version 1 to 3, then jumps to version 7
 # branch 2: version 1-3 and then 7 to 11
 
+counter2 <- NULL
 a <- 1
 for (a in 1:length(idx_nonmembers_branche2)){ 
   i <- idx_nonmembers_branche2[a]
@@ -281,17 +421,29 @@ for (a in 1:length(idx_nonmembers_branche2)){
   # 
   # get all rows with tmp_folder
   tmp_idx <- which(DF$folder_names == tmp_folder)
-  # subset rows by only taken those after i
+  # subset rows by only taken those on or after i
+  # i is the first row folder X appears whose owner is not part of the project
   tmp_idx <- tmp_idx[which(tmp_idx >= i)]
   # find the top contributor for tmp_folder in version tmp_version
-  # first subset top_contr_now by version
-  tmp_contributors <- top_contr_now[top_contr_now$ver == tmp_version,]
-  tmp_contributors <- tmp_contributors[tmp_contributors$folder_names == tmp_folder,] # Subset 1
-  tmp_folder_contributor <- tmp_contributors[ # Subset 2
-    tmp_contributors$ver == tmp_version,3][[1]][1] # pick first developer when 2 tie in contribution
   
-  # assign top contributors to all tmp_folder instances after i
-  DF[tmp_idx,45] <- tmp_folder_contributor
+  # subset top_contr_now by version
+  tmp_contributors <- top_contr_now[top_contr_now$ver == tmp_version,]
+  
+  # (Subset 1) by folder name
+  tmp_contributors <- tmp_contributors[tmp_contributors$folder_names == tmp_folder,] 
+  
+  tmp <- dim(tmp_contributors)[1] !=  0
+  counter2 <- c(counter2, tmp)
+  
+  if(dim(tmp_contributors)[1] !=  0){
+    tmp_folder_contributor <- tmp_contributors[ # Subset 2
+    tmp_contributors$ver == tmp_version,3][[1]][1] # pick first developer when 2 tie in contribution
+    
+    # assign top contributors to all tmp_folder instances after i
+    DF[tmp_idx,45] <- tmp_folder_contributor
+  
+  }
+  
   a = a+1
 }
 
@@ -299,121 +451,128 @@ sink()
 
 #View(DF[DF$members == FALSE, c(43:45)]) # visual inspection of folder owner changes
 
+# check if folder owner's part of project
+# create a logical vector indicating if the folder owner is member in the project version
+members_vec <- NULL
+for (i in 1:nrow(DF)){
+  tmp_owner <- DF[i, 45] # stores the name of the new owner
+  tmp_version <- DF[i, 6] # stores the version number
+  if(tmp_owner %in% authatt[authatt$ver2 == tmp_version,2]){ 
+    # creates a logical vector (TRUE/FALSE) if an author is member in a version
+    tmp_member <- TRUE
+  }
+  else{
+    tmp_member <- FALSE
+  }
+  members_vec <- c(members_vec, tmp_member)
+}
+
+DF$new_members <- members_vec # adds the logical vector to DF. 
+
+table(DF$new_members)
+# error rate per version
+DF %>% select(new_members, ver) %>% group_by(ver) %>% 
+  mutate(n = n()) %>%
+  group_by(ver, new_members) %>%
+  mutate(n_newmembers = n(),
+            freq = round(n_newmembers/n*100,2)) %>% 
+  unique() %>%
+  pivot_wider(id_cols = c(ver, n), names_from = new_members, values_from=freq)
+
+
 table(DF[DF$members == FALSE, 43] == DF[DF$members == FALSE, 45])
-# 1672 trues. it's getting worse and worse. I think error is when subsetting tmp_contributions
-# 26/09/2019: getting better. fewer errors. 1509 trues, and 2465 false
-# 26/09/2019: took out the if statement testing for tmp_version as the idx is already
-# filtered. after this, error rate is 130 (out of 3974 rows)
-130/(3844+130)
-# error rate: 3%
-# error rate per version
+# # 1672 trues. it's getting worse and worse. I think error is when subsetting tmp_contributions
+# # 26/09/2019: getting better. fewer errors. 1509 trues, and 2465 false
+# # 26/09/2019: took out the if statement testing for tmp_version as the idx is already
+# # filtered. after this, error rate is 130 (out of 3974 rows)
+# 130/(3844+130)
+# # error rate: 3%
+# # error rate per version
+# 
+# # trouble shooting error
+# idx <- which(DF[DF$members == FALSE, 43] == DF[DF$members == FALSE, 45])
+# View(head(DF[DF$members == FALSE, ][idx,]))
+# write.csv(DF[DF$members == FALSE, ][idx,c(1,3,6,39,43:45)], 'df_check.csv')
+# 
+# # I'm going to use id_rev 20216 to trouble shot
+# DF[DF$ID_rev == 20216,43:45]
+# which(DF$ID_rev == 20216) #id 1916
+# # folder owner is chiara.moretti, version 2
+# View(authatt) # chiara is only in version 1
+# tst_folder <- DF[DF$ID_rev == 20216, 42] # col 42 is folder_names
+# # let's check top contribution file
+# top_contr_now[top_contr_now$folder_names == tst_folder,]
+# # returns data frame with two rows. first row is version 1, second row is verion 2
+# # potential problem: top_contr_now not subsetting by version
+# # solution: I added a line to first subset top_contr_now by tmp_version
+# # error 2 was in how tmp_idx was subsetted. It needed to include all rows with index
+# # greater than or equal to i
+# # error 3: in second loop ownership is not assigned to another person. it's like the 
+# # index is skipped. every time I test the loop with one i, it works. I run the loop
+# # and the numerb of wrong assignments decreases. 
+# DF[DF$ID_rev == 163043,c(6, 43:45)]
+# which(DF$ID_rev == 163043) 
+# tst_folder <- DF[DF$ID_rev == 163043, 42][1] #
+# top_contr_now[top_contr_now$folder_names == tst_folder,]
 
-# trouble shooting error
-idx <- which(DF[DF$members == FALSE, 43] == DF[DF$members == FALSE, 45])
-View(head(DF[DF$members == FALSE, ][idx,]))
-write.csv(DF[DF$members == FALSE, ][idx,c(1,3,6,39,43:45)], 'df_check.csv')
-
-# I'm going to use id_rev 20216 to trouble shot
-DF[DF$ID_rev == 20216,43:45]
-which(DF$ID_rev == 20216) #id 1916
-# folder owner is chiara.moretti, version 2
-View(authatt) # chiara is only in version 1
-tst_folder <- DF[DF$ID_rev == 20216, 42] # col 42 is folder_names
-# let's check top contribution file
-top_contr_now[top_contr_now$folder_names == tst_folder,]
-# returns data frame with two rows. first row is version 1, second row is verion 2
-# potential problem: top_contr_now not subsetting by version
-# solution: I added a line to first subset top_contr_now by tmp_version
-# error 2 was in how tmp_idx was subsetted. It needed to include all rows with index
-# greater than or equal to i
-# error 3: in second loop ownership is not assigned to another person. it's like the 
-# index is skipped. every time I test the loop with one i, it works. I run the loop
-# and the numerb of wrong assignments decreases. 
-DF[DF$ID_rev == 163043,c(6, 43:45)]
-which(DF$ID_rev == 163043) 
-tst_folder <- DF[DF$ID_rev == 163043, 42][1] #
-top_contr_now[top_contr_now$folder_names == tst_folder,]
 
 
-# error rate per version
-DF[DF$members == FALSE, ][idx,c(1,3,6,39,43:45)] %>% group_by(ver) %>% 
-  #count()
-  summarize(n = n()) %>%
-  mutate(freq = round(n/sum(n)*100,2))
-
-DF %>% select(c(1,6,43:45)) %>%
-  group_by(ver) %>% mutate(nrow_vers = n()) %>%
-  ungroup() %>%
-  filter(DF$members == FALSE) %>%
-  filter(folder_owner == new_owner) %>%
-  #filter(DF[DF$members == FALSE, 43] == DF[DF$members == FALSE, 45]) %>%
-  group_by(ver) %>%
-  mutate(false_rows = n()) %>%
-  select(ver, nrow_vers, false_rows) %>% unique() %>%
-  mutate(error_rate = round(false_rows/nrow_vers*100,2)) %>%
-  write_csv("error_rate_ownership_assignment.csv")
-# errors in version 3 to 6. ALl error rates below 10 %. 
-# biggest issue in version 4
-# mark these folder_owners as 'external member'
-idx <- which(DF[DF$members == FALSE, 43] == DF[DF$members == FALSE, 45])
-head(DF[DF$members == FALSE,][idx, 43:45])
-DF[DF$members == FALSE,][idx,45] <- 'external member'
-
+# folder who are owned by a person not part of the project are kept like it is
 
 ownership_change <- reshape2::melt(table(DF$folder_owner, DF$new_owner))
 ownership_change <- ownership_change[-which(as.character(ownership_change$Var1) == 
                                               as.character(ownership_change$Var2)),]
 ownership_change <- ownership_change[!ownership_change$value == 0,]
 
-ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() + 
-  labs(title="Change in ownership of folders", x = 'Original Owner', y = 'New Owner') +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
-ggsave('ownership_change.png')
+#ggplot(ownership_change, aes(x = Var1, y = Var2, fill = value)) + geom_raster() + 
+#   labs(title="Change in ownership of folders", x = 'Original Owner', y = 'New Owner') +
+#   theme(axis.text.x = element_text(angle=45, hjust=1))
+# ggsave('ownership_change.png')
 
 write_csv(DF, "df_modified.csv" )
 
 
-# create a file owner & file name (n*m) matrix ----------------------------
-
-# load the file df_modified as DF if starting a new session
-DF <- read_csv("df_modified.csv")
-
-# subset DF created above to only take the column with the file name and the folder owner 
-# the column filename is the shorter version of Filename
-nm <- DF %>% select(new_owner, filename, ver)
-
-write_csv(nm, 'ownership_matrix_csv')
-
-# add weights to the edgelist by counting how often developer-file pair is in nm. 
-# This drops the column version
-nm_all <- nm %>% group_by(new_owner, filename) %>% count()
-#inspect
-nm_all
-
-# create one huge matrix
-#load the igraph package
-library(igraph)
-# create a 2 mode graph from nm_all, excluding the weight column. This will be added later manually
-g <- graph.data.frame(nm_all %>% select(-n), directed = F)
-#the second column of edges is TRUE type (file names are set as type == TRUE)
-V(g)$type <- V(g)$name %in% nm_all[,2] 
-# add edge weights.
-# pull means to pull out the data from the tibble object nm_all. 
-# as.numeric makes sure the data is in number format
-E(g)$weight <- as.numeric(pull(nm_all[,3]))
-g
-
-# you can plot g, but best not in R. It's better do it in Gephi. 
-# R might crash as it is too big. 
-
-# transform the graph into a matrix. 
-# The sparse=FALSE argument tells it to show the 0s in the adjacency matrix. 
-# the attr= n argument tells it to show the edge value
-g_all <- get.incidence(g, sparse = TRUE) # this will cause R to crash
+# # create a file owner & file name (n*m) matrix ----------------------------
 # 
-# As I can't pull out the complete network at once, I could
-# option 1: take out all nodes that aren't in the comm realized network
-# option 2: pull out only a subset and then glue the matrices together
+# # load the file df_modified as DF if starting a new session
+# DF <- read_csv("df_modified.csv")
+# 
+# # subset DF created above to only take the column with the file name and the folder owner 
+# # the column filename is the shorter version of Filename
+# nm <- DF %>% select(new_owner, filename, ver)
+# 
+# write_csv(nm, 'ownership_matrix_csv')
+# 
+# # add weights to the edgelist by counting how often developer-file pair is in nm. 
+# # This drops the column version
+# nm_all <- nm %>% group_by(new_owner, filename) %>% count()
+# #inspect
+# nm_all
+# 
+# # create one huge matrix
+# #load the igraph package
+# library(igraph)
+# # create a 2 mode graph from nm_all, excluding the weight column. This will be added later manually
+# g <- graph.data.frame(nm_all %>% select(-n), directed = F)
+# #the second column of edges is TRUE type (file names are set as type == TRUE)
+# V(g)$type <- V(g)$name %in% nm_all[,2] 
+# # add edge weights.
+# # pull means to pull out the data from the tibble object nm_all. 
+# # as.numeric makes sure the data is in number format
+# E(g)$weight <- as.numeric(pull(nm_all[,3]))
+# g
+# 
+# # you can plot g, but best not in R. It's better do it in Gephi. 
+# # R might crash as it is too big. 
+# 
+# # transform the graph into a matrix. 
+# # The sparse=FALSE argument tells it to show the 0s in the adjacency matrix. 
+# # the attr= n argument tells it to show the edge value
+# g_all <- get.incidence(g, sparse = TRUE) # this will cause R to crash
+# # 
+# # As I can't pull out the complete network at once, I could
+# # option 1: take out all nodes that aren't in the comm realized network
+# # option 2: pull out only a subset and then glue the matrices together
 
 
 

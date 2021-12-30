@@ -37,14 +37,20 @@ rm(list=ls())
 library(readr)
 library(tidyverse)
 library(statnet)
-
+detach("package:igraph", unload = TRUE)
 
 
 # create networks ---------------------------------------------------------
 
-source("creating_networks.R", echo = F)
-all_developers <- as.vector(dv %v% 'vertex.names')
+# source("creating_networks.R", echo = F)
+# all_developers <- as.vector(dv %v% 'vertex.names') # (or just dv)
 
+dv_master <- read_csv("communication_realized_edge_weight_by_version.csv")
+ivnet_master <- read_csv("crequired_el.csv")
+ivatt_master2 <- read_csv("authatt.csv")
+
+ivatt_master <- unique(ivatt_master2[,-c(1:2, 8)])
+all_developers <- pull(ivatt_master %>% select(author) %>% unique())
 
 
 # functions ---------------------------------------------------------------
@@ -107,13 +113,16 @@ for (i in 1: max(dv_modified$ver)) {
                     colnames(dv_modified))
   tmp1 <- dv_modified[dv_modified$ver == i, colnumbers]
   
+  # remove loops
+  tmp1 <- tmp1 %>% filter( ! author == folder_owner)
+  
   # create network
-  net <- network::network(tmp1[,-3], directed=F, 
-                 ignore.eval=F, names.eval='weights', matrix.type = 'edgelist')
+  net <- network::network(tmp1[,-3], directed=T, 
+                 ignore.eval=F, matrix.type = 'edgelist')
   
   # add missing developers
   existing_dev <- as.vector(net %v% 'vertex.names')
-  missing_dev <- all_developers[-match(net %v% 'vertex.names', dv %v% 'vertex.names')]
+  missing_dev <- all_developers[-match(existing_dev, all_developers)]
   
   existing_vertx_id <- length(existing_dev) + 1
 
@@ -127,7 +136,9 @@ for (i in 1: max(dv_modified$ver)) {
   #net <- as.network(add.isolates(net, length(missing_dev)), matrix.type = 'edgelist')
   net %v% 'vertex.names' <- c(existing_dev, missing_dev)
   net %v% 'degree' <- degree(net, gmode = "graph", cmode="freeman", rescale = TRUE)
-  net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "undirected", rescale = TRUE)
+  
+  # betweeness taken out as creating problems further down. too many NAs
+  #net %v% 'betweenness' <- betweenness(net, gmod = "graph", cmode = "directed", rescale = TRUE)
   
   dv_original[[i]] <- net
 }
@@ -235,9 +246,9 @@ df_first <- builddf(networklist = dv_first)
 # creating df with degree for all datasets --------------------------------
 
 # create vector for column names
-colnames_corr <- paste(rep(c("deg", "deg", "bet", "bet"), 11), 
-                       rep(c("est", "pval"), 22), 
-                       sort(rep(seq(1:11),4)),
+colnames_corr <- paste(rep(c("deg"), 11), 
+                       rep(c("est", "pval"), 11), 
+                       sort(rep(seq(1:11),1)),
                        sep="_")
 
 # calculate the correlations
@@ -422,7 +433,9 @@ estimates <- df_cor_lg %>%
 pvalue <-   df_cor_lg %>%
   mutate(pvalue = value) %>%
   filter(type == "pval") %>%
-  select(-index, -value, -type) %>%
+  select(-index, -value, -type)
+
+pvalue <- pvalue %>%
   add_column(sig = if_else(pvalue$pvalue < 0.05, 1, 0))
 
 df_cor2 <- full_join(estimates, pvalue)
@@ -446,11 +459,12 @@ ggplot(df_cor2, aes(x = version,
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between dichotomized and valued networks",
-       x = 'version number and SNA metric', y = 'correlation',
+       x = 'version number', y = 'correlation',
        caption = "Values that are not significant are not shown"
        ) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
-  ggsave('scatterplot_correlations_network_metrics.png', height = 9.72, width = 11.2, units = "in")
+  ggsave('scatterplot_correlations_network_metrics.png', 
+         height = 9.72, width = 11.2, units = "in")
 
 
 ggplot(df_cor2, 
@@ -523,7 +537,7 @@ ggplot(qapresult, aes(x = version, y = qapresult, color = cutoff)) +
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between valued and dichotomized network",
-       x = 'version number', y = 'correlation') + 
+       x = 'version number', y = 'correlation') %>%
   #theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
   ggsave('scatterplot_correlations_between_network.png')
 
@@ -533,7 +547,7 @@ ggplot(qapresult, aes(x = cutoff, y = qapresult, color = cutoff)) +
   scale_color_brewer(type = 'qual', palette = 6) + 
   theme_minimal() + 
   labs(title = "Correlation between dichotomized and valued networks",
-       x = 'Cut-off values for networks', y = 'QAP correlation') + 
+       x = 'Cut-off values for networks', y = 'QAP correlation') %>%
   #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   ggsave('boxplot_correlations_between_network.png', width = 10, height = 6.82, unit = "in")
 
@@ -605,7 +619,7 @@ ggplot(qapwithinnet, aes(x = cutoff, y = qapwithinnet, color = cutoff)) +
   labs(title = "Correlation within a network",
        caption = "Correlates ver1 with ver2, ver2 with ver 3 for original network and the 3 types of dichotomzied networks",
        x = 'Network type', y = 'correlation') + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
   ggsave('scatterplot_correlations_within_network.png', width = 10, height = 6.82, unit = "in")
 
 
