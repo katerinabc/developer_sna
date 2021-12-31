@@ -893,8 +893,12 @@ b1_dv <- sienaNet(array(c(dv_mat[[1]], dv_mat[[2]], dv_mat[[3]],
                         dim =c(21, 21, 6)))
 
 b1_iv <- sienaNet(array(c(iv_mat[[1]], iv_mat[[2]], iv_mat[[3]],
-                          iv_mat[[4]], iv_mat[[5]], iv_mat[[6]]), 
+                          iv_mat[[4]], iv_mat[[5]], iv_mat[[6]]),
                         dim =c(21, 21, 6)))
+
+b1_iv <- varDyadCovar(array(c(iv_mat[[1]], iv_mat[[2]], iv_mat[[3]],
+                              iv_mat[[4]], iv_mat[[5]]), 
+                            dim =c(21, 21, 5)))
 
 branch1 <- sienaDataCreate(b1_dv, b1_iv, 
                            b1_jobtitle, location, b1_contract, b1_membership)# define data
@@ -1073,16 +1077,285 @@ siena.table(b8_ans, type="html")
 # # close the plot file:
 # graphics.off()
 
-Multipar.RSiena(b8_ans, 6)
+res <- Multipar.RSiena(b8_ans, 6)
 
 # testing significance of parameters
+
+chi <- NULL
+df <- NULL
+pval <- NULL
+oneside <- NULL
+ef <- NULL
+for (i in c(1:30)){
+  tmp <- Multipar.RSiena(b8_ans, i)
+  tmp <- unlist(tmp)
+  
+  chi <- c(chi, as.numeric(tmp[[1]]))
+  df <- c(df, as.numeric(tmp[[2]]))
+  pval <- c(pval, as.numeric(tmp[[3]]))
+  oneside <- c(oneside, as.numeric(tmp[[4]]))
+  ef <- c(ef, tmp[[5]])
+}
+
 
 b8_results <- tibble(effect = b8_ans$effects$effectName,
                      estimate = round(b8_ans$theta,3),
                      st.error = round(b8_ans$se,3),
                      zscore = round(b8ans_est/b8ans_se,3),
-                     pval = round(2*pnorm(q=zscore, lower.tail=FALSE),3)
-)
+                     chi = chi,
+                     df = df,
+                     pval = round(pval,3),
+                     oneside= round(oneside,3),
+                     ef = ef)
+b8_results %>% readr::write_csv("branch1_results.csv")
+
+
+# branch 1 no coevolution -------------------------------------------------
+
+
+
+b1_iv <- varDyadCovar(array(c(iv_mat[[1]], iv_mat[[2]], iv_mat[[3]],
+                              iv_mat[[4]], iv_mat[[5]]), 
+                            dim =c(21, 21, 5)))
+
+branch1 <- sienaDataCreate(b1_dv, b1_iv, 
+                           b1_jobtitle, location, b1_contract, b1_membership)# define data
+
+print01Report(branch1, modelname = 'branch1_developer_coordination_nocoevolution' )
+
+b1eff <- getEffects( branch1 )
+b1eff # default effects
+effectsDocumentation(b1eff)
+
+b1eff <- includeEffects( b1eff, inPopSqrt, transTrip, include=TRUE)
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_membership')
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'location')
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_contract')
+b1eff <- includeEffects(b1eff, absDiffX, interaction1 = 'b1_jobtitle')
+b1eff <- includeEffects(b1eff, X, interaction1 = 'b1_iv')
+b1eff <- includeEffects(b1eff, XRecip, interaction1 = 'b1_iv')
+b1eff <- includeEffects(b1eff, WWX, interaction1 = 'b1_iv')
+b1eff <- includeEffects(b1eff, OutWWX, interaction1 = 'b1_iv')
+
+b9_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, 
+                  batch=TRUE, returnDeps=TRUE)
+b9_ans
+
+# excluding reciprocity as not in data
+b1eff <- includeEffects( b1eff,recip, include=FALSE)
+b1eff <- includeEffects(b1eff, XRecip, interaction1 = 'b1_iv', include=FALSE)
+
+b9_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, 
+                  batch=TRUE, returnDeps=TRUE)
+b9_ans
+# converged
+
+gofb1_6 <- sienaGOF(b9_ans, 
+                    IndegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_6)
+plot(gofb1_6)
+# good. p.value 0.005, underestimate for indeg > 0
+
+gofb1_7 <- sienaGOF(b9_ans, 
+                    OutdegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_7)
+plot(gofb1_7)
+#pval: 0.01, too many 0's andnoth enough 1 & 2
+
+gofb1_8 <- sienaGOF(b9_ans, 
+                    TriadCensus, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_8)
+plot(gofb1_8)
+#pval 0.004, need more 021D
+
+b1eff <- includeEffects( b1eff, inPop, include=TRUE)
+b9_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, 
+                  batch=TRUE, returnDeps=TRUE)
+b9_ans # converged on 1st run
+
+
+gofb1_6 <- sienaGOF(b9_ans, 
+                    IndegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_6)
+plot(gofb1_6)
+# good. 0.246
+
+gofb1_7 <- sienaGOF(b9_ans, 
+                    OutdegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_7)
+plot(gofb1_7, center=FALSE, scale=FALSE)
+#pval: 0.015; outdegree 2 not well modeled
+
+gofb1_8 <- sienaGOF(b9_ans, 
+                    TriadCensus, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_8)
+plot(gofb1_8)
+#pval 0.007
+
+b1eff <- includeEffects( b1eff, balance, include=TRUE)
+b9_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE,
+                  returnDeps=TRUE, prevAns=b9_ans)
+b9_ans # converged on 2nd run
+
+# doing GOF
+
+gofb1_6 <- sienaGOF(b9_ans, 
+                    IndegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_6)
+plot(gofb1_6)
+# good. 0.216
+
+gofb1_7 <- sienaGOF(b9_ans, 
+                    OutdegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_7)
+plot(gofb1_7, center=FALSE, scale=FALSE)
+#pval: 0.01; outdegree 2 not well modeled
+
+gofb1_8 <- sienaGOF(b9_ans, 
+                    TriadCensus, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_8)
+plot(gofb1_8)
+#pval 0.212
+
+b1eff <- includeEffects( b1eff, inIsDegree, include=TRUE)
+# in-isolate Outdegree e↵ect, (inIsDegree), the (additional) 
+# out-degree (or activity) effect for actors w
+b9_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, 
+                   returnDeps=TRUE, prevAns=b9_ans)
+b9_ans # converged on 4 run
+
+gofb1_6 <- sienaGOF(b9_ans, 
+                    IndegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_6)
+plot(gofb1_6) #p0.301
+
+gofb1_7 <- sienaGOF(b9_ans, 
+                    OutdegreeDistribution, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_7)
+plot(gofb1_7, center=FALSE, scale=FALSE)
+#pval: 0.072; outdegree 1 & 2 not well modeled
+
+
+gofb1_8 <- sienaGOF(b9_ans, 
+                    TriadCensus, 
+                    verbose=TRUE, join=TRUE,
+                    varName="b1_dv")
+summary(gofb1_8)
+plot(gofb1_8) #p0.785
+
+
+tt6 <- sienaTimeTest(b9_ans)
+summary(tt6)
+# time heterogeneity is an issue
+# period 1 and 4 impacted
+# effects: balance, location, membership and density
+# including time effects ruins the model
+# 
+# 
+b1eff <- includeTimeDummy(b1eff, density, timeDummy="1,4, 5", include=TRUE)
+b10_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE,
+                  returnDeps=TRUE, prevAns = b10_ans)
+b10_ans # converged on 2nd run
+
+tt7 <- sienaTimeTest(b10_ans, effects = 1:13)
+summary(tt7)
+
+
+chi <- NULL
+df <- NULL
+pval <- NULL
+oneside <- NULL
+ef <- NULL
+for (i in c(1:16)){
+  tmp <- Multipar.RSiena(b10_ans, i)
+  tmp <- unlist(tmp)
+  
+  chi <- c(chi, as.numeric(tmp[[1]]))
+  df <- c(df, as.numeric(tmp[[2]]))
+  pval <- c(pval, as.numeric(tmp[[3]]))
+  oneside <- c(oneside, as.numeric(tmp[[4]]))
+  ef <- c(ef, tmp[[5]])
+}
+
+
+b10_results <- tibble(effect = b10_ans$effects$effectName,
+                     estimate = round(b10_ans$theta,3),
+                     st.error = round(b10_ans$se,3),
+                     zscore = round(estimate/st.error,3),
+                     chi = chi,
+                     df = df,
+                     pval = round(pval,3),
+                     oneside= round(oneside,3),
+                     ef = ef)
+b10_results %>% readr::write_csv("branch1_no_coev_results.csv")
+
+
+
+
+
+
+
+# # time heterogeneity is an issue (p = 0.0008)
+# balance is an issue --> ok adding balance for 
+# period 2 and 3 ruins it
+# 
+# b1eff <- includeTimeDummy(b1eff, balance, timeDummy="all",
+#                           include=FALSE)
+# b11_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE,
+#                    returnDeps=TRUE)
+# b11_ans # converged on 2nd  run
+# tt8 <- sienaTimeTest(b11_ans, effects = 1:12)
+# summary(tt8)
+
+# # adding this effect results in NA for SE, but can't exclude it
+# # using the includeTimeDummy function
+# # b1eff <- includeTimeDummy(b1eff, OutWWX, WWX, timeDummy="2", 
+# #                           interaction1 = 'b1_iv', include=TRUE)
+# b12_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, 
+#                    returnDeps=TRUE, prevAns = b12_ans)
+# b12_ans # converged on  3rd run, 
+# # but why NA for SE for b1_dv ego?
+# tt8 <- sienaTimeTest(b12_ans, effects = 1:12)
+# summary(tt8)
+# # less severe problem, but still significant
+# # remove effects for period 2 and focus on period 1
+# # period 1 is party based on data that was not collected
+# 
+# b1eff <- includeTimeDummy(b1eff, density, OutWWX, WWX, timeDummy="2", 
+#                           interaction1 = 'b1_iv', include=FALSE)
+# 
+# b1eff <- includeTimeDummy(b1eff, OutWWX, timeDummy="1", 
+#                           interaction1 = 'b1_iv', include=TRUE)
+# b1eff <- includeTimeDummy(b1eff, transTrip, timeDummy="1", include=TRUE)
+# b1eff <- includeTimeDummy(b1eff, sameX, interaction1="b1_membership", timeDummy="1", include=TRUE)
+# b13_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, 
+#                    returnDeps=TRUE)
+# b13_ans # converged on 2nd  run
+# tt9 <- sienaTimeTest(b13_ans, effects = 1:12)
+# summary(tt9)
+
 
 # branch 2 ----------------------------------------------------------------
 
