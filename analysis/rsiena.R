@@ -3,7 +3,7 @@
 # author: Katerina Bohle Carbonell
 # 
 # created: 12-12-2021
-# updated: 28-12-2021
+# updated: 24-01-2022
 # 
 # dependent on
 # helper functions: ("functions_developer_sna.R", echo = F)
@@ -83,7 +83,6 @@ ivnet_master <- readr::read_csv("crequired_el.csv")
 
 # specify Rsiena objects DV --------------------------------------------------
 #nodeset <- as.vector((dv_first[[1]] %v% 'vertex.names'))
-
 
 
 dv_modified <-
@@ -910,10 +909,12 @@ b1eff # default effects
 effectsDocumentation(b1eff)
 
 
-# check myalgorithm. They should be the same for both branches
-# myalgorithm <- sienaAlgorithmCreate(projname = 'developer_coordination_model',
-#                                     nsub = 4, 
-#                                     n3 = 5000)
+# check myalgorithm. They should be the same for both branches. 
+# Uncomment these lines to if the project 'myalgorithm' 
+# needs to be created
+myalgorithm <- sienaAlgorithmCreate(projname = 'developer_coordination_model',
+                                    nsub = 4,
+                                    n3 = 5000)
 
 
 b1eff <- includeEffects( b1eff, crprod, type = 'endow', name = "b1_iv",interaction1 = 'b1_dv')
@@ -935,21 +936,23 @@ b1_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDe
 b1_ans
 # overall convergence still bad (0.85) but convergence for
 # individual effects is good. Aslo no huge SE anymore
-b2_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b1_ans)
-b2_ans #better
+# b2_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b1_ans)
+# b2_ans #better
+# b3_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b2_ans)
+# b3_ans #better
+# save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
+# b4_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b3_ans)
+# b4_ans #better
+# save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
+# b5_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b4_ans)
+# b5_ans #better
+# save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
+# b6_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b5_ans)
+# b6_ans #converged
+# save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
 
-b3_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b2_ans)
-b3_ans #better
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch2.RData")
-b4_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b3_ans)
-b4_ans #better
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch2.RData")
-b5_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b4_ans)
-b5_ans #better
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch2.RData")
-b6_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b5_ans)
-b6_ans #converged
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch2.RData")
+# Instead of rerunning the model, load the final object (b6_ans)
+load("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
 
 gofb1_1 <- sienaGOF(b6_ans, 
                  IndegreeDistribution, 
@@ -1003,7 +1006,7 @@ plot(gofb1_5)
 # Error in neighborsHigher[[i]] : subscript out of bounds
 # Timing stopped at: 0.051 0.005 0.102
 
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch2.RData")
+save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
 
 tt <- sienaTimeTest(b6_ans)
 summary(tt)
@@ -1014,7 +1017,7 @@ b1eff <- includeTimeDummy(b1eff, density, timeDummy="1,4")
 
 b7_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, returnDeps=TRUE, prevAns = b6_ans)
 b7_ans #converged
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch2.RData")
+save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
 
 tt2 <- sienaTimeTest(b7_ans)
 summary(tt2)
@@ -1056,15 +1059,17 @@ summary(tt4)
 # no time heterogeneity problem
 
 b7_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch1.RData")
+save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
 
 b8_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, prevAns=b7_ans)
 b8_ans
-save.image("~/Documents/gitrepo/developer_sna/analysis/branch1.RData")
+save.image("~/Documents/gitrepo/developer_sna/analysis/branch1_results.RData")
 
 tt5 <- sienaTimeTest(b8_ans, effects = 6:15)
 summary(tt5)
 # time heterogeneity: pval = 0.0167
+
+
 sink("branch1_finalresult.txt")
 b8_ans
 sink()
@@ -1283,13 +1288,122 @@ tt7 <- sienaTimeTest(b10_ans, effects = 1:13)
 summary(tt7)
 
 
+# test is positive for period 1 --> 
+# remove period 1 OR add a time dummy for all of period 1 variables. 
+
+# b1 no coevolution no ver 1 ----------------------------------------------
+
+
+b1_dv_2345 <- sienaNet(array(c(dv_mat[[2]], dv_mat[[3]],
+                          dv_mat[[4]], dv_mat[[5]], dv_mat[[6]]), 
+                        dim =c(21, 21, 5)))
+
+b1_iv_2345 <- varDyadCovar(array(c(iv_mat[[2]], iv_mat[[3]],
+                              iv_mat[[4]], iv_mat[[5]]), 
+                            dim =c(21, 21, 4)))
+b1_jobtitle_2345 <- varCovar(jobt[,2:6])
+b1_contract_2345 <- varCovar(cont[,2:6])
+b1_membership_2345 <- varCovar(mem[,2:6])
+
+
+branch1_2345 <- sienaDataCreate(b1_dv_2345, b1_iv_2345, 
+                           b1_jobtitle_2345, location, 
+                           b1_contract_2345, b1_membership_2345)# define data
+
+b1eff_2345 <- getEffects( branch1_2345 )
+b1eff_2345 # default effects
+effectsDocumentation(b1eff_2345)
+
+b1eff_2345 <- includeEffects(b1eff_2345, inPopSqrt, transTrip, include=TRUE)
+b1eff_2345 <- includeEffects(b1eff_2345, sameX, interaction1 = 'b1_membership_2345')
+b1eff_2345 <- includeEffects(b1eff_2345, sameX, interaction1 = 'location')
+b1eff_2345 <- includeEffects(b1eff_2345, sameX, interaction1 = 'b1_contract_2345')
+b1eff_2345 <- includeEffects(b1eff_2345, absDiffX, interaction1 = 'b1_jobtitle_2345')
+b1eff_2345 <- includeEffects(b1eff_2345, X, interaction1 = 'b1_iv_2345')
+b1eff_2345 <- includeEffects(b1eff_2345, WWX, interaction1 = 'b1_iv_2345')
+b1eff_2345 <- includeEffects(b1eff_2345, OutWWX, interaction1 = 'b1_iv_2345')
+
+#b1eff_2345 <- includeEffects( b1eff_2345, Xrecip, include=FALSE, interaction1 = 'b1_iv_2345')
+
+b1eff_2345 <- includeEffects( b1eff_2345, recip, include=FALSE)
+b1eff_2345 <- includeEffects( b1eff_2345, inPop, include=TRUE)
+b1eff_2345 <- includeEffects( b1eff_2345, balance, include=TRUE)
+b1eff_2345 <- includeEffects( b1eff_2345, inIsDegree, include=TRUE)
+
+b11_ans <- siena07(myalgorithm, data=branch1_2345, effects=b1eff_2345, batch=TRUE,
+                   returnDeps=TRUE)
+b11_ans # converged on 2nd run
+
+# that doesn't work at all. SE of density and in-isolate outdegree 
+# shoots up. Remove inPop
+b1eff_2345 <- includeEffects( b1eff_2345, inIsDegree, include=FALSE)
+
+b11_ans <- siena07(myalgorithm, data=branch1_2345, effects=b1eff_2345, batch=TRUE,
+                   returnDeps=TRUE)
+# better. No total convergence, but no very high SE
+b12_ans <- siena07(myalgorithm, data=branch1_2345, effects=b1eff_2345, batch=TRUE,
+                   returnDeps=TRUE, prevAns = b11_ans)
+b12_ans # converged
+
+
+tt7 <- sienaTimeTest(b12_ans, effects = 1:12)
+summary(tt7)
+# no time homogeneity
+
+b1eff_2345 <- includeTimeDummy(b1eff_2345, density, timeDummy="2,3", include=TRUE)
+b1eff_2345 <- includeTimeDummy(b1eff_2345, sameX, interaction1 = 'location', timeDummy="2,3", include=TRUE)
+
+b12_ans <- siena07(myalgorithm, data=branch1_2345, effects=b1eff_2345, batch=TRUE,
+                   returnDeps=TRUE)
+b12_ans <- siena07(myalgorithm, data=branch1_2345, effects=b1eff_2345, batch=TRUE,
+                   returnDeps=TRUE, prevAns=b12_ans)
+
+tt8 <- sienaTimeTest(b12_ans, effects = 1:12)
+summary(tt8)
+
+# time homogeneity just ok ( p = 0.07)
+
+
+# now GOF for branch 1 (no version 1, no coevolution) ---------------------
+
+
+# (smaller p values are worse)
+# 
+gof1 <- sienaGOF(b12_ans, 
+                 IndegreeDistribution, 
+                 verbose=TRUE, join=TRUE,
+                 varName="b1_dv_2345")
+summary(gof1)
+plot(gof1)
+# p = 0.46 => good
+
+gof2 <- sienaGOF(b12_ans, 
+                 OutdegreeDistribution, 
+                 verbose=TRUE, join=TRUE,
+                 varName="b1_dv_2345")
+summary(gof2)
+plot(gof2)
+# p = 0.065, fit for outdegree < 4 could be better
+
+gof3 <- sienaGOF(b12_ans, 
+                 TriadCensus, 
+                 verbose=TRUE, join=TRUE,
+                 varName=c("b1_dv_2345"))
+summary(gof3)
+plot(gof3)
+# p-value is 0.193 --> good fit
+
+
+# effect test -------------------------------------------------------------
+
+
 chi <- NULL
 df <- NULL
 pval <- NULL
 oneside <- NULL
 ef <- NULL
 for (i in c(1:16)){
-  tmp <- Multipar.RSiena(b10_ans, i)
+  tmp <- Multipar.RSiena(b12_ans, i)
   tmp <- unlist(tmp)
   
   chi <- c(chi, as.numeric(tmp[[1]]))
@@ -1300,61 +1414,26 @@ for (i in c(1:16)){
 }
 
 
-b10_results <- tibble(effect = b10_ans$effects$effectName,
-                     estimate = round(b10_ans$theta,3),
-                     st.error = round(b10_ans$se,3),
+b12_results <- tibble(effect = b12_ans$effects$effectName,
+                     estimate = round(b12_ans$theta,3),
+                     st.error = round(b12_ans$se,3),
                      zscore = round(estimate/st.error,3),
                      chi = chi,
                      df = df,
                      pval = round(pval,3),
                      oneside= round(oneside,3),
                      ef = ef)
-b10_results %>% readr::write_csv("branch1_no_coev_results.csv")
+b12_results %>% readr::write_csv("branch1_no_coev_no_ver1_results.csv")
+
+
+# interpretation:
+# Balance: If two developers are connected to the same person, 
+# at t1, they  are less likely to start forming a tie at t2
+# Indegree pop+ sqr: There is a U-shaped RS btw indegree
+# at t1 and at t2. 
 
 
 
-
-
-
-
-# # time heterogeneity is an issue (p = 0.0008)
-# balance is an issue --> ok adding balance for 
-# period 2 and 3 ruins it
-# 
-# b1eff <- includeTimeDummy(b1eff, balance, timeDummy="all",
-#                           include=FALSE)
-# b11_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE,
-#                    returnDeps=TRUE)
-# b11_ans # converged on 2nd  run
-# tt8 <- sienaTimeTest(b11_ans, effects = 1:12)
-# summary(tt8)
-
-# # adding this effect results in NA for SE, but can't exclude it
-# # using the includeTimeDummy function
-# # b1eff <- includeTimeDummy(b1eff, OutWWX, WWX, timeDummy="2", 
-# #                           interaction1 = 'b1_iv', include=TRUE)
-# b12_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, 
-#                    returnDeps=TRUE, prevAns = b12_ans)
-# b12_ans # converged on  3rd run, 
-# # but why NA for SE for b1_dv ego?
-# tt8 <- sienaTimeTest(b12_ans, effects = 1:12)
-# summary(tt8)
-# # less severe problem, but still significant
-# # remove effects for period 2 and focus on period 1
-# # period 1 is party based on data that was not collected
-# 
-# b1eff <- includeTimeDummy(b1eff, density, OutWWX, WWX, timeDummy="2", 
-#                           interaction1 = 'b1_iv', include=FALSE)
-# 
-# b1eff <- includeTimeDummy(b1eff, OutWWX, timeDummy="1", 
-#                           interaction1 = 'b1_iv', include=TRUE)
-# b1eff <- includeTimeDummy(b1eff, transTrip, timeDummy="1", include=TRUE)
-# b1eff <- includeTimeDummy(b1eff, sameX, interaction1="b1_membership", timeDummy="1", include=TRUE)
-# b13_ans <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, 
-#                    returnDeps=TRUE)
-# b13_ans # converged on 2nd  run
-# tt9 <- sienaTimeTest(b13_ans, effects = 1:12)
-# summary(tt9)
 
 
 # branch 2 ----------------------------------------------------------------
