@@ -53,24 +53,25 @@ ivatt_master2 <- readr::read_csv("authatt.csv")
 # the variable (here location) is first transformed from a numerical
 # variable to a categorical variable (called factor in R)
 # then the numbers are transformed to letters using fct_relabel
-# 
-# 
-# DECISION: KBC DECIDED TO NOT DO THIS AS BUG IN RSIENA COVAR CREATION
-# CAN'T USE A FACTOR
-# 
-# ivatt_master2$location <- as.factor(ivatt_master2$location)
-# ivatt_master2$location<- forcats::fct_relabel(
-#   as.factor(ivatt_master2$location), function(x) letters[1:length(levels(ivatt_master2$location))])
-# 
-# ivatt_master2$jobtitle_raw <- as.factor(ivatt_master2$jobtitle_raw)
-# ivatt_master2$jobtitle_raw<- forcats::fct_relabel(
-#   as.factor(ivatt_master2$jobtitle_raw), 
-#   function(x) letters[1:length(levels(ivatt_master2$jobtitle_raw))])
-# 
+
+# Rsiena needs every categorical variable to be its own dummy variable
+
+ivatt_master2$location <- as.factor(ivatt_master2$location)
+ivatt_master2$location <- forcats::fct_recode(
+  ivatt_master2$location, Italy = '0', China = '1', India = '2')
+
+ivatt_master2$jobtitle_raw <- as.factor(ivatt_master2$jobtitle_raw)
+ivatt_master2$jobtitle_raw<- forcats::fct_recode(
+  ivatt_master2$jobtitle_raw, Dev = '0',
+  SeniorDev = '1', OSDev = '2', Architect = '4', Consultant = '5', ProjectLeader = '6', 
+  )
+
+# Don't know what 0 and 1 stands for
 # ivatt_master2$contract <- as.factor(ivatt_master2$contract)
-# ivatt_master2$contract<- forcats::fct_relabel(
-#   as.factor(ivatt_master2$contract), 
-#   function(x) letters[1:length(levels(ivatt_master2$contract))])
+# ivatt_master2$contract<- forcats::fct_recode(
+#   ivatt_master2$contract,
+#   
+# )
 
 
 ivatt_master2 <- ivatt_master2[,-c(1:2)]
@@ -627,7 +628,7 @@ summary(gof3b)
 plot(gof3b) #pvalue of 0.17 -> good
 
 
-# re-run model for papr ---------------------------------------------------
+# re-run model for paper ---------------------------------------------------
 
 # once GOF is good, modify the algorithm to run longer. 
 # rerun the final model, do all the checks again (convergence, 
