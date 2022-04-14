@@ -62,8 +62,8 @@ ivatt_master2$location <- forcats::fct_recode(
 
 ivatt_master2$jobtitle_raw <- as.factor(ivatt_master2$jobtitle_raw)
 ivatt_master2$jobtitle_raw<- forcats::fct_recode(
-  ivatt_master2$jobtitle_raw, Dev = '0',
-  SeniorDev = '1', OSDev = '2', Architect = '4', Consultant = '5', ProjectLeader = '6', 
+  ivatt_master2$jobtitle_raw, lower = '0',
+  lower = '1', lower = '2', higher = '4', higher = '5', higher = '6', 
   )
 
 # Don't know what 0 and 1 stands for
@@ -167,13 +167,13 @@ for (i in 1:11){
     )}
     
     #print(atmp)
-    jobtitle <- c(jobtitle, (pull(atmp, jobtitle_raw)))
+    jobtitle <- c(jobtitle, as.character(atmp$jobtitle_raw))
     #jobtitle <- c(jobtitle, as.character(pull(atmp, jobtitle_raw)))
     # print( jobtitle)
-    location <- c(location, (pull(atmp, location)))
+    location <- c(location, as.character(atmp$location))
     #location <- c(location,as.character(pull(atmp, location)))
     # print(location)
-    contract <- c(contract, (pull(atmp, contract)))
+    contract <- c(contract, as.character(atmp$contract))
     #contract <- c(contract, as.character(pull(atmp, contract)))
     # print(contract)
     # member <- c(member, pull(atmp[4]))
@@ -212,14 +212,32 @@ for (i in 1:11){
 # (1) a vector AND (2) numeric OR a factor. But a vector can not be factor
 # Don't use covariates as weights
 
-# locations - does not change
+# locations - does change
 loc <- NULL
 for (i in 1: length(dv_mat)){
-  tmp <- as.factor(dv_first[[i]] %v% 'location')
+  tmp <- dv_first[[i]] %v% 'location'
   loc <- cbind(loc, tmp)
 }
-#location <- as.factor(loc[,1])
-location <- coCovar(loc[,1])
+
+Italy <- loc
+Italy[Italy == 'Italy'] <- 1
+Italy[Italy != '1'] <- 0
+class(Italy) <- "numeric"
+IT <- varCovar(Italy)
+
+China <- loc
+China[China == 'China'] <- 1
+China[China != '1'] <- 0
+class(China) <- "numeric"
+CH <- varCovar(China)
+
+India <- loc
+India[India == 'India'] <- 1
+India[India != '1'] <- 0
+class(India) <- "numeric"
+IN <- varCovar(India)
+
+
 
 # jobtitle - changes per version
 jobt <- NULL
@@ -233,7 +251,42 @@ for (i in 1: (length(dv_mat) - 1)){
 colnames(jobt) <- seq(1:10)
 rownames(jobt) <- seq(1:21)
 
-jobtitle <- varCovar(jobt)
+higher <- jobt
+higher[higher == 'higher'] <- 1
+higher[higher != '1'] <- 0
+class(higher) <- "numeric"
+higher <- varCovar(higher)
+
+# Dev <- jobt
+# Dev[Dev == 'Dev'] <- 1
+# Dev[Dev != '1'] <- 0
+# class(Dev) <- "numeric"
+# Dev <- varCovar(Dev)
+# 
+# OSDev <- jobt
+# OSDev[OSDev == 'OSDev'] <- 1
+# OSDev[OSDev != '1'] <- 0
+# class(OSDev) <- "numeric"
+# OSDev <- varCovar(OSDev)
+# 
+# ProjectLeader <- jobt
+# ProjectLeader[ProjectLeader == 'ProjectLeader'] <- 1
+# ProjectLeader[ProjectLeader != '1'] <- 0
+# class(ProjectLeader) <- "numeric"
+# ProjectLeader <- varCovar(ProjectLeader)
+# 
+# Architect <- jobt
+# Architect[Architect == 'Architect'] <- 1
+# Architect[Architect != '1'] <- 0
+# class(Architect) <- "numeric"
+# Architect <- varCovar(Architect)
+# 
+# Consultant <- jobt
+# Consultant[Consultant == 'Consultant'] <- 1
+# Consultant[Consultant != '1'] <- 0
+# class(Consultant) <- "numeric"
+# Consultant <- varCovar(Consultant)
+
 
 # contract - changes per version
 cont <- NULL
@@ -246,6 +299,7 @@ for (i in 1: length(dv_mat)){
 
 colnames(cont) <- seq(1:11)
 rownames(cont) <- seq(1:21)
+class(cont) <- "numeric"
 contract <- varCovar(cont)
 
 # # membership - changes per version
@@ -267,7 +321,19 @@ membership <- varCovar(mem)
 # you need to indicate which colummns to use.
 # for example if you only use version 3 until version 6,
 # limit the columns to 3:6
-b1_jobtitle <- varCovar(jobt[,3:6])
+#b1_jobtitle <- varCovar(jobt[,3:6])
+b1_italy <- varCovar(IT[,3:6])
+b1_china <- varCovar(CH[,3:6])
+b1_india <- varCovar(IN[,3:6])
+
+# b1_dev <- varCovar(Dev[,3:6])
+# b1_sendev <- varCovar(SeniorDev[,3:6])
+# b1_osdev <- varCovar(OSDev[,3:6])
+# b1_cons <- varCovar(Consultant[,3:6])
+# b1_prjled <- varCovar(ProjectLeader[,3:6])
+# b1_arch <- varCovar(Architect[,3:6])
+b1_higher <- varCovar(higher[,3:6])
+
 b1_contract <- varCovar(cont[,3:6])
 b1_membership <- varCovar(mem[,3:6])
 
@@ -346,7 +412,10 @@ iv_2 <- sienaNet(array(c(iv_mat[[2]], iv_mat[[3]],
 # DV read in as a DIRECTED network
 # IV read in as a DIRECTED network
 branch1 <- sienaDataCreate(branch1_dv, branch1_iv, 
-                          b1_jobtitle, location, b1_contract, b1_membership)
+                           b1_india, b1_italy, b1_china,
+                           b1_sendev, b1_dev, b1_osdev, b1_prjled, b1_cons, b1_arch,
+                           b1_contract, 
+                           b1_membership)
 
 
 # This report is a simple text file that shows  you basic info about
@@ -461,15 +530,29 @@ b1eff
 
 # add actor effects -------------------------------------------------------
 
-b1eff <- includeEffects(b1eff, sameX, interaction1 = 'location', include=TRUE)
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_india', include=TRUE)
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_china', include=TRUE)
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_italy', include=FALSE)
+# italy is the reference point
+
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_contract', include=TRUE)
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_membership', include=TRUE)
-b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_jobtitle', include=TRUE)
 
-b1eff <- includeEffects(b1eff, sameX, interaction1 = 'location', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_cons', include=TRUE)
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_prjled', include=TRUE)
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_sendev', include=TRUE)
+
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_india', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_china', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_italy', include=FALSE, name = "branch1_iv")
+# italy is the reference point
+# 
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_contract', include=TRUE, name = "branch1_iv")
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_membership', include=TRUE, name = "branch1_iv")
-b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_jobtitle', include=TRUE, name = "branch1_iv")
+
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_cons', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_prjled', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_sendev', include=TRUE, name = "branch1_iv")
 
 
 ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
@@ -482,6 +565,12 @@ ans1
 # On a 2nd run convergence was ok
 # On a 3rd run maxium convergence was 0.2570
 # On a 4th run, t-ratio for branch1_dv: reciprocity 0.1190
+# 
+# # 14/04/2022
+# when adding the more detailed actor attributes t-ratio increases to
+# 0.36 --> KBC mistake. added all 3 countries --> removed Italy --> convergence
+# (didn't need to run ans2, but the code below includes ans2
+# and I was too lazy to change all the code again)
 
 ans2 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, prevAns = ans1)
 ans2
@@ -489,9 +578,15 @@ ans2
 
 # time homogeneity for ans1 -----------------------------------------------
 
-tt <- sienaTimeTest(ans2, effects = c(4, 6:11, 17:24))
+tt <- sienaTimeTest(ans2, effects = c(4, 7:10, 12:14))
+tt <- sienaTimeTest(ans2, effects = c(20, 22:26, 28:30))
 summary(tt)
 
+# 14/04/22
+# for branch1_dv homogeneity issue with density in period 1
+b1eff <- includeTimeDummy(b1eff, density, timeDummy="1", include=TRUE)
+# for branch1_iv no issues
+# 
 # check summary(tt)
 # the joint significance test should be non-significant.
 # then I go and check for where the problem is: 
@@ -511,8 +606,8 @@ summary(tt)
 # period wise: period 1 and 2
 
 # to include a time dummy you need to add
-b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'location', timeDummy="2")
-b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'b1_membership', timeDummy="2")
+#b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'location', timeDummy="2")
+#b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'b1_membership', timeDummy="2")
 
 
 # new model with time variables -------------------------------------------
@@ -520,40 +615,85 @@ b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'b1_membership', timeDumm
 ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
 ans1
 
-# that's even worse. 
-b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'location', timeDummy="2", include = FALSE)
-b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'b1_membership', timeDummy="2", include = FALSE)
 
-# included a timedummy for density for time period 1 and 
-# dv network because the effect wise pval for density is 0 
-# and pvalue for period 1 is 0.001, and
-# pval for dummy (dv X density) is 0.001
-# controlled for refernece point (period 1) 
-# instead of period 2 as more issues seem to be at the start
-b1eff <- includeTimeDummy(b1eff, density, timeDummy="1")
+
+# # 12/04/2022
+# # that's even worse. 
+# #b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'location', timeDummy="2", include = FALSE)
+# #b1eff <- includeTimeDummy(b1eff, sameX, interaction1 = 'b1_membership', timeDummy="2", include = FALSE)
+# 
+# # included a timedummy for density for time period 1 and 
+# # dv network because the effect wise pval for density is 0 
+# # and pvalue for period 1 is 0.001, and
+# # pval for dummy (dv X density) is 0.001
+# # controlled for reference point (period 1) 
+# # instead of period 2 as more issues seem to be at the start
+# 
+# 
+# ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
+# ans1
+# 
+# # convergence slightly bad (0.2576)
+# # b1eff <- includeTimeDummy(b1eff, density, timeDummy="1", include = FALSE)
+# # b1eff <- includeTimeDummy(b1eff, egoX, density, timeDummy = "all")
+# 
+# ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
+# ans2 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, prevAns = ans1)
+# # standard errors not reliable
+# # advised to drop reciprocity (which matches
+# # previous experience running models and hte data
+# # )
+# 
+# b1eff <- includeEffects(b1eff, recip, include=FALSE)
+# 
+# ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
+# ans2 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, prevAns = ans1)
+# ans2
+# # t-ratio for 1 effect betweeness sqr is -0.1084....
+# # rest is ok
+
+# update 14/04/2022
+# model converged. 
+tt <- sienaTimeTest(ans1, effects = c(4, 7:10, 12:14))
+summary(tt)
+# 14/04/2022: better (p = 0.0092). 
+# improvements maybe via dummy for b1_india or b1_membership
+b1eff <- includeTimeDummy(b1eff, egoX, interaction1= 'b1_india', timeDummy="1", include=TRUE)
+tt <- sienaTimeTest(ans1, effects = c(21, 23:27, 29:31))
+summary(tt)
+# 14/04/22: no issues
 
 ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
 ans1
-
-# convergence slightly bad (0.2576)
-b1eff <- includeTimeDummy(b1eff, density, timeDummy="1", include = FALSE)
-
-b1eff <- includeTimeDummy(b1eff, egoX, density, timeDummy = "all")
-
-ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
-ans2 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, prevAns = ans1)
-# standard errors not reliable
-# advised to drop reciprocity (which matches
-# previous experience running models and hte data
-# )
-
-b1eff <- includeEffects(b1eff, recip, include=FALSE)
-
-ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
 ans2 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE, prevAns = ans1)
 ans2
-# t-ratio for 1 effect betweeness sqr is -0.1084....
-# rest is ok
+
+# 14/04/22 forget about that. reset ans1 to previous model and do gof
+b1eff <- includeTimeDummy(b1eff, egoX, interaction1= 'b1_india', timeDummy="1", include=FALSE)
+ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)
+ans1
+
+
+# new model 14/04/2022 ----------------------------------------------------
+
+
+# based on the text output for the data there are no mutual ties in branch1_dv
+# take out reciprocity
+# try this: Italy is HQ --> people have to coordinate with HQ --> add an effect for HQ
+b1eff <- includeEffects(b1eff, recip, include=FALSE)
+b1eff <- includeTimeDummy(b1eff, egoX, interaction1= 'b1_india', timeDummy="1", include=FALSE)
+b1eff <- includeEffects(b1eff, sameX, interaction1="b1_india", include=FALSE)
+b1eff <- includeEffects(b1eff, sameX, interaction1="b1_china", include=FALSE)
+b1eff <- includeEffects(b1eff, sameX, interaction1="b1_contract", include=FALSE)
+b1eff <- includeEffects(b1eff, sameX, interaction1="b1_contract", name = 'branch1_iv', include=FALSE)
+b1eff <- includeEffects(b1eff, sameX, interaction1="b1_india", name = 'branch1_iv', include=FALSE)
+b1eff <- includeEffects(b1eff, sameX, interaction1="b1_china", name = 'branch1_iv', include=FALSE)
+
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_italy', include=TRUE)
+b1eff <- includeEffects(b1eff, inPop)
+b1eff <- includeEffects(b1eff, inPopSqrt)
+
+
 
 # GOF for ans1 ------------------------------------------------------------
 
@@ -573,7 +713,7 @@ gof1a <- sienaGOF(ans2,
 summary(gof1a)
 plot(gof1a) # pvalue of 0 => bad
 # no fit, 
-# indegree of 0 overestimated
+# indegrees of 0 overestimated
 # indegrees above 2 underestimated
 
 gof1b <- sienaGOF(ans2, 
