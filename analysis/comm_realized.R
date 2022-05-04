@@ -40,7 +40,8 @@ library(networkDynamicData)
 library(sna)
 library(ndtv)
 
-#load the dataset. df_modified has been created in the file ownership_developer_sna.R
+#load the dataset. 
+#df_modified has been created in the file ownership_developer_sna.R
 #df_modified is 
 df <- read_csv('df_modified.csv')
 

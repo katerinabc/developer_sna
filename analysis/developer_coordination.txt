@@ -6,7 +6,7 @@ Filename is developer_coordination.txt.
 
 This file contains primary output for SIENA project <<developer_coordination>>.
 
-Date and time: 29/12/2021 09:35:24 
+Date and time: 04/05/2022 10:19:16 
 
 RSiena version 1.3.0.1 (02 05 2021)
 
@@ -15,14 +15,14 @@ RSiena version 1.3.0.1 (02 05 2021)
 Data input.
 ===========
 
-11 observations,
+4 observations,
 21 actors,
 2 dependent network variables,
 0 dependent bipartite variables,
 0 dependent discrete behavior variables,
 0 dependent continuous behavior variables,
-1 constant actor covariates,
-3 exogenous changing actor covariates,
+0 constant actor covariates,
+12 exogenous changing actor covariates,
 0 constant dyadic covariates,
 0 exogenous changing dyadic covariates,
 0 no files with times of composition change.
@@ -32,35 +32,9 @@ Data input.
 Reading network variables.
 --------------------------
 
-Name of this network variable: dv.
+Name of this network variable: branch1_dv.
 oneMode network.
 For observation moment 1, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  2  0  0  1  1  0  1  0  1  0  1  0  0  2  0  1  0  0  2 
- 1
-in-degrees
- 0  0  0  0  4  9  0  0  0  0  0  0  0  0  0  0  0  0  0  0 
- 0
-
-No missing data for observation 1.
-
-For observation moment 2, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  1  0  0  0  1  0  1  0  2  0  0  2  0  1  0  3  0  0  5 
- 1
-in-degrees
- 3  2  0  0  1  8  0  0  0  0  0  0  0  0  2  0  0  0  0  1 
- 0
-
-No missing data for observation 2.
-
-For observation moment 3, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -71,9 +45,9 @@ in-degrees
  3  2  0  0  3  9  0  0  0  0  0  0  0  0  1  0  0  0  0  1 
  0
 
-No missing data for observation 3.
+No missing data for observation 1.
 
-For observation moment 4, degree distributions are as follows:
+For observation moment 2, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -84,9 +58,9 @@ in-degrees
  4  4  0  4  4 11  0  0  0  1  0  0  2  0  2  0  1  0  0  1 
  0
 
-No missing data for observation 4.
+No missing data for observation 2.
 
-For observation moment 5, degree distributions are as follows:
+For observation moment 3, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -97,9 +71,9 @@ in-degrees
  2  0  0  2  5  8  0  0  0  0  0  0  0  0  1  0  0  0  0  0 
  0
 
-No missing data for observation 5.
+No missing data for observation 3.
 
-For observation moment 6, degree distributions are as follows:
+For observation moment 4, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -110,103 +84,12 @@ in-degrees
  4  0  0  3  3  8  0  0  0  1  0  0  0  0  0  0  0  0  0  2 
  0
 
-No missing data for observation 6.
-
-For observation moment 7, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  0  7  0  0  0  0  3  1  6  0  0  2  1  3  1  7  2  4  7 
- 2
-in-degrees
- 5  6  0  4  5 11  0  0  0  1  0  0  2  0  5  0  2  0  3  2 
- 0
-
-No missing data for observation 7.
-
-For observation moment 8, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  0  1  0  0  0  0  2  2  2  0  0  0  2  0  0  3  2  4  0 
- 0
-in-degrees
- 0  0  0  2  4  7  0  0  0  2  0  0  0  0  3  0  0  0  0  0 
- 0
-
-No missing data for observation 8.
-
-For observation moment 9, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  0  0  0  0  0  1  3  3  0  0  0  0  1  1  4  6  1  3  0 
- 0
-in-degrees
- 4  0  0  3  2  6  0  0  0  0  0  0  0  0  4  0  0  1  2  1 
- 0
-
-No missing data for observation 9.
-
-For observation moment 10, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  0  0  0  0  0  1  3  6  0  0  0  0  1  0  0  3  1  2  0 
- 0
-in-degrees
- 2  0  0  0  0  6  0  1  0  0  0  0  0  0  3  0  0  0  4  1 
- 0
-
-No missing data for observation 10.
-
-For observation moment 11, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  0  0  0  0  0  0  5  1  0  1  0  0  1  0  2  2  1  2  0 
- 0
-in-degrees
- 1  0  0  2  0  4  0  0  0  1  0  0  0  0  1  0  0  2  4  0 
- 0
-
-No missing data for observation 11.
+No missing data for observation 4.
 
 
-Name of this network variable: iv.
+Name of this network variable: branch1_iv.
 oneMode network.
 For observation moment 1, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 1  0  1  1  2  7  0  1  0  2  0  0  1  0  1  0  0  1  2  1 
- 0
-in-degrees
- 2  0  0  1  2 11  0  0  0  1  0  0  1  0  1  0  0  0  2  0 
- 0
-
-No missing data for observation 1.
-
-For observation moment 2, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 1  0  0  1  1  3  0  0  0  1  0  0  0  0  0  0  0  0  0  0 
- 0
-in-degrees
- 1  0  0  1  1  4  0  0  0  0  0  0  0  0  0  0  0  0  0  0 
- 0
-
-No missing data for observation 2.
-
-For observation moment 3, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -217,9 +100,9 @@ in-degrees
  5  0  0  0  2  3  0  0  0  0  0  0  0  0  0  0  2  0  1  0 
  0
 
-No missing data for observation 3.
+No missing data for observation 1.
 
-For observation moment 4, degree distributions are as follows:
+For observation moment 2, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -230,9 +113,9 @@ in-degrees
  0  0  0  0  0  5  0  0  0  2  0  0  0  0  6  0  0  0  2  1 
  0
 
-No missing data for observation 4.
+No missing data for observation 2.
 
-For observation moment 5, degree distributions are as follows:
+For observation moment 3, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -243,9 +126,9 @@ in-degrees
  1  0  2  1  1  5  0  0  0  0  0  0  1  0  1  0  1  0  2  2 
  0
 
-No missing data for observation 5.
+No missing data for observation 3.
 
-For observation moment 6, degree distributions are as follows:
+For observation moment 4, degree distributions are as follows:
 Nodes
  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
 21
@@ -256,174 +139,145 @@ in-degrees
  0  0  0  1  0  5  0  0  0  0  0  0  0  0  0  0  3  0  3  0 
  0
 
-No missing data for observation 6.
-
-For observation moment 7, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 1  0  0  3  0  2  0  0  0  1  0  0  0  0  2  0  1  0  2  0 
- 0
-in-degrees
- 0  0  0  0  0  5  0  0  0  0  0  0  0  0  2  0  5  0  0  0 
- 0
-
-No missing data for observation 7.
-
-For observation moment 8, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 1  0  0  1  1  2  0  0  0  0  0  0  0  0  1  0  0  0  0  0 
- 0
-in-degrees
- 0  0  0  0  1  3  0  0  0  0  0  0  0  0  0  0  2  0  0  0 
- 0
-
-No missing data for observation 8.
-
-For observation moment 9, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  0  0  0  2  5  0  1  0  2  0  0  0  0  1  0  2  0  1  0 
- 0
-in-degrees
- 0  0  0  0  1  5  0  1  0  0  0  0  0  0  1  0  1  0  5  0 
- 0
-
-No missing data for observation 9.
-
-For observation moment 10, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 0  1  0  1  2  3  0  0  0  1  0  0  0  0  0  0  1  0  1  0 
- 0
-in-degrees
- 1  0  0  0  0  5  0  0  0  1  0  0  0  0  3  0  0  0  0  0 
- 0
-
-No missing data for observation 10.
-
-For observation moment 11, degree distributions are as follows:
-Nodes
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-21
-out-degrees
- 1  0  0  0  0  5  0  0  0  1  0  0  0  0  1  0  3  0  1  0 
- 0
-in-degrees
- 0  0  0  1  1  5  0  0  0  1  0  0  0  0  2  0  0  0  2  0 
- 0
-
-No missing data for observation 11.
+No missing data for observation 4.
 
 
-
-
-@2
-Reading constant actor covariates.
-----------------------------------
-
-1 variable, named:
-location        
-
-A total of 1 non-changing individual covariate.
-
-Number of missing cases:
-location        0 	( 0.0 %)
-
-Information about covariates:
-              minimum  maximum	  mean  centered 
-location        0.0     1.0      0.143    Y 
-The mean value is subtracted from the centered covariate.
 
 
 @2
 Reading exogenous changing actor covariates.
 --------------------------------------------
 
-3 variables, named:
-jobtitle        
-contract        
-membership      
+12 variables, named:
+b1_india        
+b1_italy        
+b1_china        
+b1_higher       
+b1_contract     
+b1_membership   
+b1_timework     
+b1_TimeDedic    
+b1_Gender       
+b1_age          
+b1_OrgTenure    
+b1_JobTenure    
 
-A total of 3 exogenous changing actor covariates.
+A total of 12 exogenous changing actor covariates.
 
 Number of missing cases per period:
- period                    1       2       3       4       5       6       7       8       9      10     overall
-jobtitle                   0       0       0       0       0       0       0       0       0       0        0 	   ( 0.0 %)
-contract                   0       0       0       0       0       0       0       0       0       0        0 	   ( 0.0 %)
-membership                 0       0       0       0       0       0       0       0       0       0        0 	   ( 0.0 %)
+ period                    1       2       3     overall
+b1_india                   0       0       0        0 	   ( 0.0 %)
+b1_italy                   0       0       0        0 	   ( 0.0 %)
+b1_china                   0       0       0        0 	   ( 0.0 %)
+b1_higher                  0       0       0        0 	   ( 0.0 %)
+b1_contract                0       0       0        0 	   ( 0.0 %)
+b1_membership              0       0       0        0 	   ( 0.0 %)
+b1_timework               11      11       2       24 	   ( 38.1 %)
+b1_TimeDedic              11      11       2       24 	   ( 38.1 %)
+b1_Gender                 21      21      21       63 	   ( 100.0 %)
+b1_age                    11      11       2       24 	   ( 38.1 %)
+b1_OrgTenure              11      11       2       24 	   ( 38.1 %)
+b1_JobTenure              11      11       2       24 	   ( 38.1 %)
 
 Information about changing covariates:
 
               minimum  maximum	  mean  centered 
-jobtitle                                   Y 
-	period   1     0.0     6.0      1.619 
-	period   2     0.0     6.0      1.238 
-	period   3     0.0     6.0      1.524 
-	period   4     0.0     6.0      1.190 
-	period   5     0.0     6.0      1.048 
-	period   6     0.0     6.0      1.714 
-	period   7     0.0     6.0      1.571 
-	period   8     0.0     6.0      1.619 
-	period   9     0.0     6.0      2.381 
-	period  10     0.0     6.0      2.143 
-Overall                            1.605 
+b1_india                                   Y 
+	period   1     0.0     1.0      0.048 
+	period   2     0.0     1.0      0.143 
+	period   3     0.0     1.0      0.143 
+Overall                            0.111 
 
-contract                                   Y 
-	period   1     0.0     1.0      0.095 
-	period   2     0.0     1.0      0.095 
+b1_italy                                   Y 
+	period   1     0.0     1.0      0.810 
+	period   2     0.0     1.0      0.714 
+	period   3     0.0     1.0      0.619 
+Overall                            0.714 
+
+b1_china                                   Y 
+	period   1     0.0     1.0      0.143 
+	period   2     0.0     1.0      0.143 
 	period   3     0.0     1.0      0.238 
-	period   4     0.0     1.0      0.238 
-	period   5     0.0     1.0      0.381 
-	period   6     0.0     1.0      0.286 
-	period   7     0.0     1.0      0.190 
-	period   8     0.0     1.0      0.333 
-	period   9     0.0     1.0      0.190 
-	period  10     0.0     1.0      0.286 
-Overall                            0.233 
+Overall                            0.175 
 
-membership                                 Y 
-	period   1     0.0     1.0      0.524 
-	period   2     0.0     1.0      0.524 
-	period   3     0.0     1.0      0.476 
-	period   4     0.0     1.0      0.571 
-	period   5     0.0     1.0      0.381 
-	period   6     0.0     1.0      0.333 
-	period   7     0.0     1.0      0.714 
-	period   8     0.0     1.0      0.476 
-	period   9     0.0     1.0      0.429 
-	period  10     0.0     1.0      0.333 
-Overall                            0.476 
+b1_higher                                  Y 
+	period   1     0.0     1.0      0.238 
+	period   2     0.0     1.0      0.143 
+	period   3     0.0     1.0      0.238 
+Overall                            0.206 
+
+b1_contract                                Y 
+	period   1     0.0     1.0      0.143 
+	period   2     0.0     1.0      0.238 
+	period   3     0.0     1.0      0.238 
+Overall                            0.206 
+
+b1_membership                              Y 
+	period   1     0.0     1.0      0.571 
+	period   2     0.0     1.0      0.571 
+	period   3     0.0     1.0      0.571 
+Overall                            0.571 
+
+b1_timework                                Y 
+	period   1    10.0    10.0     10.000 
+	period   2    52.0    52.0     52.000 
+	period   3    42.0    42.0     42.000 
+Overall                           36.359 
+
+b1_TimeDedic                               Y 
+	period   1    50.0    50.0     50.000 
+	period   2    20.0    20.0     20.000 
+	period   3    20.0   100.0     72.632 
+Overall                           53.333 
+
+b1_Gender                                  Y 
+	period   1     Inf    -Inf        NaN 
+	period   2     Inf    -Inf        NaN 
+	period   3     Inf    -Inf        NaN 
+Overall                              NaN 
+
+b1_age                                     Y 
+	period   1     3.0    41.0     31.400 
+	period   2    28.0    42.0     35.500 
+	period   3    29.0    40.0     32.474 
+Overall                           32.974 
+
+b1_OrgTenure                               Y 
+	period   1     3.0    41.0     31.400 
+	period   2    28.0    42.0     35.500 
+	period   3    29.0    40.0     32.474 
+Overall                           32.974 
+
+b1_JobTenure                               Y 
+	period   1     3.0    41.0     31.400 
+	period   2    28.0    42.0     35.500 
+	period   3    29.0    40.0     32.474 
+Overall                           32.974 
 
 The mean values are subtracted from the covariates.
 
 
 
-Network iv
-All network changes are downward for the following periods:
-1 => 2;
-This will be respected in the simulations.
-
 The mean structural dissimilarity values subtracted in the
 balance calculations are
-for network dv                  0.0835.
-for network iv                  0.0513.
+for network branch1_dv          0.0853.
+for network branch1_iv          0.0638.
 
 For the similarity variable calculated from each actor covariate,
 the mean is subtracted.
 These means are:
-Similarity location                 :       0.7429 
-Similarity jobtitle                 :       0.6687 
-Similarity contract                 :       0.6410 
-Similarity membership               :       0.5019 
+Similarity b1_india                 :       0.7968 
+Similarity b1_italy                 :       0.5841 
+Similarity b1_china                 :       0.7016 
+Similarity b1_higher                :       0.6603 
+Similarity b1_contract              :       0.6603 
+Similarity b1_membership            :       0.4857 
+Similarity b1_timework              :       1.0000 
+Similarity b1_TimeDedic             :       0.7031 
+Similarity b1_Gender                :          NaN 
+Similarity b1_age                   :       0.8402 
+Similarity b1_OrgTenure             :       0.8402 
+Similarity b1_JobTenure             :       0.8402 
 
 
 
@@ -438,127 +292,75 @@ Change in networks:
 
 
 @3
-Network: dv
-           
+Network: branch1_dv
+                   
 For the following statistics, missing values (if any) are not counted.
 
 Network density indicators:
-observation time              1      2      3      4      5      6      7
-density                    0.031  0.040  0.045  0.081  0.043  0.050  0.110
-average degree             0.619  0.810  0.905  1.619  0.857  1.000  2.190
-number of ties                13     17     19     34     18     21     46
-missing fraction           0.000  0.000  0.000  0.000  0.000  0.000  0.000
-observation time              8      9     10     11
-density                    0.043  0.055  0.040  0.036
-average degree             0.857  1.095  0.810  0.714
-number of ties                18     23     17     15
+observation time              1      2      3      4
+density                    0.045  0.081  0.043  0.050
+average degree             0.905  1.619  0.857  1.000
+number of ties                19     34     18     21
 missing fraction           0.000  0.000  0.000  0.000
 
-The average degree is 1.043 
+The average degree is 1.095 
 
 
 Tie changes between subsequent observations:
  periods        0 =>  0   0 =>  1   1 =>  0   1 =>  1   Distance Jaccard   Missing
-  1 ==>   2       398         9         5         8        14     0.364         0 (0%)
-  2 ==>   3       395         8         6        11        14     0.440         0 (0%)
-  3 ==>   4       381        20         5        14        25     0.359         0 (0%)
-  4 ==>   5       383         3        19        15        22     0.405         0 (0%)
-  5 ==>   6       392        10         7        11        17     0.393         0 (0%)
-  6 ==>   7       367        32         7        14        39     0.264         0 (0%)
-  7 ==>   8       369         5        33        13        38     0.255         0 (0%)
-  8 ==>   9       388        14         9         9        23     0.281         0 (0%)
-  9 ==>  10       390         7        13        10        20     0.333         0 (0%)
- 10 ==>  11       395         8        10         7        18     0.280         0 (0%)
+  1 ==>   2       381        20         5        14        25     0.359         0 (0%)
+  2 ==>   3       383         3        19        15        22     0.405         0 (0%)
+  3 ==>   4       392        10         7        11        17     0.393         0 (0%)
 
 Directed dyad Counts:
  observation    total    mutual    asymm.     null
-     1.           420        2        22       396
-     2.           420        0        34       386
-     3.           420        0        38       382
-     4.           420        0        68       352
-     5.           420        0        36       384
-     6.           420        0        42       378
-     7.           420        4        84       332
-     8.           420        0        36       384
-     9.           420        0        46       374
-    10.           420        0        34       386
-    11.           420        0        30       390
+     1.           420        0        38       382
+     2.           420        0        68       352
+     3.           420        0        36       384
+     4.           420        0        42       378
 
 Standard values for initial parameter values
 -------------------------------------------------
 
-constant dv rate (period 1)             1.4067 
-constant dv rate (period 2)             1.4067 
-constant dv rate (period 3)             2.5040 
-constant dv rate (period 4)             2.2048 
-constant dv rate (period 5)             1.7059 
-constant dv rate (period 6)             3.9007 
-constant dv rate (period 7)             3.8010 
-constant dv rate (period 8)             2.3045 
-constant dv rate (period 9)             2.0052 
-constant dv rate (period 10)            1.8057 
-dv: outdegree (density)                           -1.3477 
+constant branch1_dv rate (period 1)     2.5040 
+constant branch1_dv rate (period 2)     2.2048 
+constant branch1_dv rate (period 3)     1.7059 
+branch1_dv: outdegree (density)                   -1.2287 
 
 @3
-Network: iv
-           
+Network: branch1_iv
+                   
 For the following statistics, missing values (if any) are not counted.
 
 Network density indicators:
-observation time              1      2      3      4      5      6      7
-density                    0.050  0.017  0.031  0.038  0.040  0.029  0.029
-average degree             1.000  0.333  0.619  0.762  0.810  0.571  0.571
-number of ties                21      7     13     16     17     12     12
-missing fraction           0.000  0.000  0.000  0.000  0.000  0.000  0.000
-observation time              8      9     10     11
-density                    0.014  0.033  0.024  0.029
-average degree             0.286  0.667  0.476  0.571
-number of ties                 6     14     10     12
+observation time              1      2      3      4
+density                    0.031  0.038  0.040  0.029
+average degree             0.619  0.762  0.810  0.571
+number of ties                13     16     17     12
 missing fraction           0.000  0.000  0.000  0.000
 
-The average degree is 0.606 
+The average degree is 0.69 
 
 
 Tie changes between subsequent observations:
  periods        0 =>  0   0 =>  1   1 =>  0   1 =>  1   Distance Jaccard   Missing
-  1 ==>   2       399         0        14         7        14     0.333         0 (0%)
-  2 ==>   3       404         9         3         4        12     0.250         0 (0%)
-  3 ==>   4       395        12         9         4        21     0.160         0 (0%)
-  4 ==>   5       392        12        11         5        23     0.179         0 (0%)
-  5 ==>   6       395         8        13         4        21     0.160         0 (0%)
-  6 ==>   7       403         5         5         7        10     0.412         0 (0%)
-  7 ==>   8       405         3         9         3        12     0.200         0 (0%)
-  8 ==>   9       404        10         2         4        12     0.250         0 (0%)
-  9 ==>  10       401         5         9         5        14     0.263         0 (0%)
- 10 ==>  11       403         7         5         5        12     0.294         0 (0%)
+  1 ==>   2       395        12         9         4        21     0.160         0 (0%)
+  2 ==>   3       392        12        11         5        23     0.179         0 (0%)
+  3 ==>   4       395         8        13         4        21     0.160         0 (0%)
 
 Directed dyad Counts:
  observation    total    mutual    asymm.     null
-     1.           420       14        14       392
-     2.           420        6         2       412
-     3.           420        6        14       400
-     4.           420        2        28       390
-     5.           420        6        22       392
-     6.           420        6        12       402
-     7.           420        4        16       400
-     8.           420        2         8       410
-     9.           420        8        12       400
-    10.           420        2        16       402
-    11.           420        6        12       402
+     1.           420        6        14       400
+     2.           420        2        28       390
+     3.           420        6        22       392
+     4.           420        6        12       402
 
 Standard values for initial parameter values
 -------------------------------------------------
 
-constant iv rate (period 1)             1.4067 
-constant iv rate (period 2)             1.2071 
-constant iv rate (period 3)             2.1050 
-constant iv rate (period 4)             2.3045 
-constant iv rate (period 5)             2.1050 
-constant iv rate (period 6)             1.0076 
-constant iv rate (period 7)             1.2071 
-constant iv rate (period 8)             1.2071 
-constant iv rate (period 9)             1.4067 
-constant iv rate (period 10)            1.2071 
-iv: outdegree (density)                           -1.6230 
+constant branch1_iv rate (period 1)     2.1050 
+constant branch1_iv rate (period 2)     2.3045 
+constant branch1_iv rate (period 3)     2.1050 
+branch1_iv: outdegree (density)                   -1.6449 
 
 Initialisation of project <<developer_coordination>> executed succesfully.

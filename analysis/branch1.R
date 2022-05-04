@@ -6,10 +6,16 @@
 # author: Katerina Bohle Carbonell
 # 
 # created: 25-01-2022
-# updated: 12-04-2022
+# updated: 04-05-2022
 # 
 # dependent on
 # helper functions: ("functions_developer_sna.R", echo = F)
+# 
+# Flow for building the network:
+# (1. run data import)
+# ownership_developer_sna.R
+# comm_realized (until line 74, the rest is just visualization) 
+# communication_required (until line 130, , the rest is just visualization)
 
 # TUTORIAL FOR RSIENA: 
 # scripts: https://www.stats.ox.ac.uk/~snijders/siena/siena_scripts.htm
@@ -17,8 +23,9 @@
 rm(list = ls()) # clean everything
 set.seed(1234)
 
+
 # TODO: 
-# transform actor attributes to characters
+# 
 
 # packages ----------------------------------------------------------------
 
@@ -39,6 +46,8 @@ source("functions_developer_sna.R", echo = F)
 dv_master <- readr::read_csv("communication_realized_edge_weight_by_version.csv")
 ivnet_master <- readr::read_csv("crequired_el.csv")
 ivatt_master2 <- readr::read_csv("authatt.csv")
+
+names(ivatt_master2)[c(8,9,10,13,14)] <- c('jobtitle', 'timeworking', 'timededicated','OrgTen', 'JobTen') 
 
 # modify attribute data ---------------------------------------------------
 
@@ -149,6 +158,12 @@ for (i in 1:11){
   jobtitle <- NULL
   location <- NULL
   contract <- NULL
+  timeworking <- NULL
+  timededicated <- NULL
+  age <- NULL
+  gender <- NULL
+  OrgTen <- NULL
+  JobTen <- NULL
   #member <- NULL
   member2 <- NULL
   print(i)
@@ -157,12 +172,20 @@ for (i in 1:11){
     
     atmp <- as.vector(ivatt_master2 %>% 
                         filter(author == j & ver2 == i) %>%
-                        select(jobtitle_raw, location, contract, ver2) %>%
+                        select(jobtitle_raw, location, contract, ver2,
+                               timeworking, timededicated, age, gender, 
+                               OrgTen, JobTen) %>%
                         unique())
     
     if (purrr::is_empty(atmp)) {atmp <- tibble(jobtitle_raw = NA,
                                                location = NA,
-                                               contract = NA
+                                               contract = NA,
+                                               timeworking = NA,
+                                               timededicated = NA,
+                                               age = NA,
+                                               gender = NA,
+                                               OrgTen = NA,
+                                               JobTen = NA
                                                #member = "no"
     )}
     
@@ -179,6 +202,14 @@ for (i in 1:11){
     # member <- c(member, pull(atmp[4]))
     # print(member)
     
+    timeworking <- c(timeworking, as.character(atmp$timeworking))
+    timededicated <- c(timededicated, as.character(atmp$timededicated))
+    age <- c(age, as.character(atmp$age))
+    gender <- c(gender, as.character(atmp$gender))
+    OrgTen <- c(OrgTen, as.character(atmp$OrgTen))
+    JobTen <- c(JobTen, as.character(atmp$JobTen))
+    
+    
     memtmp <- if_else(j %in% pull(ivatt_master2 %>% 
                                     filter(ver2 == i) %>% 
                                     select(author)),
@@ -190,6 +221,12 @@ for (i in 1:11){
   network::set.vertex.attribute(dv_first[[i]], 'jobtitle', jobtitle)
   network::set.vertex.attribute(dv_first[[i]], 'location', location)
   network::set.vertex.attribute(dv_first[[i]], 'contract', contract)
+  network::set.vertex.attribute(dv_first[[i]], 'timeworking', timeworking)
+  network::set.vertex.attribute(dv_first[[i]], 'timededicated', timededicated)
+  network::set.vertex.attribute(dv_first[[i]], 'age', age)
+  network::set.vertex.attribute(dv_first[[i]], 'gender', gender)
+  network::set.vertex.attribute(dv_first[[i]], 'OrgTen', OrgTen)
+  network::set.vertex.attribute(dv_first[[i]], 'JobTen', JobTen)
   #network::set.vertex.attribute(dv_first[[i]], 'membership', as.numeric(member))
   network::set.vertex.attribute(dv_first[[i]], 'membership', member2)
   
@@ -321,7 +358,7 @@ membership <- varCovar(mem)
 # you need to indicate which colummns to use.
 # for example if you only use version 3 until version 6,
 # limit the columns to 3:6
-#b1_jobtitle <- varCovar(jobt[,3:6])
+# b1_jobtitle <- varCovar(jobt[,3:6])
 b1_italy <- varCovar(IT[,3:6])
 b1_china <- varCovar(CH[,3:6])
 b1_india <- varCovar(IN[,3:6])
@@ -337,6 +374,96 @@ b1_higher <- varCovar(higher[,3:6])
 b1_contract <- varCovar(cont[,3:6])
 b1_membership <- varCovar(mem[,3:6])
 
+# Timeworking - changes per version
+TimeWork <- NULL
+for (i in 1: length(dv_mat)){
+  
+  tmp <- dv_first[[i]] %v% 'timeworking'
+  
+  TimeWork <- cbind(TimeWork, tmp)
+}
+
+colnames(TimeWork) <- seq(1:11)
+rownames(TimeWork) <- seq(1:21)
+class(TimeWork) <- "numeric"
+TimeWork <- varCovar(TimeWork)
+b1_timework <- varCovar(TimeWork[,3:6])
+
+# TimeDedicated - changes per version
+TimeDedic <- NULL
+for (i in 1: length(dv_mat)){
+  
+  tmp <- dv_first[[i]] %v% 'timededicated'
+  
+  TimeDedic <- cbind(TimeDedic, tmp)
+}
+
+colnames(TimeDedic) <- seq(1:11)
+rownames(TimeDedic) <- seq(1:21)
+class(TimeDedic) <- "numeric"
+TimeDedic <- varCovar(TimeDedic)
+b1_TimeDedic <- varCovar(TimeDedic[,3:6])
+
+# Gender - changes per version
+Gender <- NULL
+for (i in 1: length(dv_mat)){
+  
+  tmp <- dv_first[[i]] %v% 'gender'
+  
+  Gender <- cbind(Gender, tmp)
+}
+
+colnames(Gender) <- seq(1:11)
+rownames(Gender) <- seq(1:21)
+class(Gender) <- "numeric"
+Gender <- varCovar(Gender)
+b1_Gender <- varCovar(Gender[,3:6])
+
+# age - changes per version
+age_mat <- NULL
+for (i in 1: length(dv_mat)){
+  
+  tmp <- dv_first[[i]] %v% 'age'
+  
+  age_mat <- cbind(age_mat, tmp)
+}
+
+colnames(age_mat) <- seq(1:11)
+rownames(age_mat) <- seq(1:21)
+class(age_mat) <- "numeric"
+age_var <- varCovar(age_mat)
+b1_age <- varCovar(age_var[,3:6])
+
+# OrgTen - changes per version
+OrgTenure <- NULL
+for (i in 1: length(dv_mat)){
+  
+  tmp <- dv_first[[i]] %v% 'age'
+  
+  OrgTenure <- cbind(OrgTenure, tmp)
+}
+
+colnames(OrgTenure) <- seq(1:11)
+rownames(OrgTenure) <- seq(1:21)
+class(OrgTenure) <- "numeric"
+age_var <- varCovar(OrgTenure)
+b1_OrgTenure <- varCovar(OrgTenure[,3:6])
+
+# JobTen - changes per version
+JobTenure <- NULL
+for (i in 1: length(dv_mat)){
+  
+  tmp <- dv_first[[i]] %v% 'age'
+  
+  JobTenure <- cbind(JobTenure, tmp)
+}
+
+
+colnames(JobTenure) <- seq(1:11)
+rownames(JobTenure) <- seq(1:21)
+class(JobTenure) <- "numeric"
+JobTenure <- varCovar(JobTenure)
+b1_JobTenure <- varCovar(JobTenure[,3:6])
 
 
 # specify Rsiena objects dyadic covariates --------------------------------------------
@@ -413,9 +540,17 @@ iv_2 <- sienaNet(array(c(iv_mat[[2]], iv_mat[[3]],
 # IV read in as a DIRECTED network
 branch1 <- sienaDataCreate(branch1_dv, branch1_iv, 
                            b1_india, b1_italy, b1_china,
-                           b1_sendev, b1_dev, b1_osdev, b1_prjled, b1_cons, b1_arch,
+                           #b1_sendev, b1_dev, b1_osdev, b1_prjled, b1_cons, b1_arch,
+                           b1_higher, 
                            b1_contract, 
-                           b1_membership)
+                           b1_membership, 
+                           b1_timework,
+                           b1_TimeDedic,
+                           b1_Gender,
+                           b1_age,
+                           b1_OrgTenure,
+                           b1_JobTenure
+                           )
 
 
 # This report is a simple text file that shows  you basic info about
@@ -426,6 +561,7 @@ print01Report(branch1, modelname = 'developer_coordination' )
 # define features of the algorithm. Here we just add a project name
 # but keep everything else as default values
 myalgorithm <- sienaAlgorithmCreate(projname = 'developer_coordination_model')
+b1eff <- getEffects( branch1 )
 
 # get effects -------------------------------------------------------------
 
@@ -538,21 +674,21 @@ b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_italy', include=FALSE)
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_contract', include=TRUE)
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_membership', include=TRUE)
 
-b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_cons', include=TRUE)
-b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_prjled', include=TRUE)
-b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_sendev', include=TRUE)
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_higher', include=TRUE)
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_age', include=TRUE)
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_TimeDedic', include=TRUE)
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_timework', include=TRUE)
 
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_india', include=TRUE, name = "branch1_iv")
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_china', include=TRUE, name = "branch1_iv")
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_italy', include=FALSE, name = "branch1_iv")
 # italy is the reference point
-# 
+
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_contract', include=TRUE, name = "branch1_iv")
 b1eff <- includeEffects(b1eff, sameX, interaction1 = 'b1_membership', include=TRUE, name = "branch1_iv")
-
-b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_cons', include=TRUE, name = "branch1_iv")
-b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_prjled', include=TRUE, name = "branch1_iv")
-b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_sendev', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_age', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_TimeDedic', include=TRUE, name = "branch1_iv")
+b1eff <- includeEffects(b1eff, egoX, interaction1 = 'b1_timework', include=TRUE, name = "branch1_iv")
 
 
 ans1 <- siena07(myalgorithm, data=branch1, effects=b1eff, batch=TRUE)

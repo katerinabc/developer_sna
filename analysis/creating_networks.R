@@ -13,6 +13,8 @@ dv_master <- read_csv("communication_realized_edge_weight_by_version.csv")
 ivnet_master <- read_csv("crequired_el.csv")
 ivatt_master2 <- read_csv("authatt.csv")
 
+names(ivatt_master2)[c(8,9,10,13,14)] <- c('jobtitle', 'timeworking', 'timededicated','OrgTen', 'JobTen') 
+
 ivatt_master <- unique(ivatt_master2[,-c(1:2, 8)])
 
 
@@ -49,6 +51,14 @@ participants <- NULL
 jobtitle <- NULL
 location <- NULL
 contract <- NULL
+jobtitle <- NULL
+timeworking <- NULL
+timededicated <- NULL
+age <- NULL
+gender <- NULL
+Orgten <- NULL
+JobTen <- NULL
+
 
 # in the following loop information for developers who are members of version 2 is stored in a 
 # number of temporary files (all begnning with tmp_).
@@ -67,6 +77,31 @@ for (i in network::get.vertex.attribute(dv, 'vertex.names')){
   tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
   print(tmp_con)
   contract <- cbind(contract, tmp_con)
+  
+  tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
+  print(tmp_con)
+  contract <- cbind(contract, tmp_con)
+  
+  tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
+  print(tmp_con)
+  contract <- cbind(contract, tmp_con)
+  
+  tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
+  print(tmp_con)
+  contract <- cbind(contract, tmp_con)
+  
+  tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
+  print(tmp_con)
+  contract <- cbind(contract, tmp_con)
+  
+  tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
+  print(tmp_con)
+  contract <- cbind(contract, tmp_con)
+  
+  tmp_con <- pull(ivatt_master[ivatt_master$author == i, 5])
+  print(tmp_con)
+  contract <- cbind(contract, tmp_con)
+  
 }
 
 #network::set.vertex.attribute(dv, 'ver2', as.numeric(t(participants)[,1]))

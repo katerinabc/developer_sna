@@ -6,7 +6,7 @@ Filename is branch1_developer_coordination_nocoevolution.txt.
 
 This file contains primary output for SIENA project <<branch1_developer_coordination_nocoevolution>>.
 
-Date and time: 30/12/2021 09:28:55 
+Date and time: 24/01/2022 10:16:11 
 
 RSiena version 1.3.0.1 (02 05 2021)
 
